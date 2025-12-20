@@ -1,0 +1,44 @@
+HELP.md
+编码规范与项目结构.md
+多人在线协作编辑软件.md
+架构设计说明.md
+接口设计文档.md
+开发日志.md
+前端页面与路由设计.md
+数据库设计.md
+用例说明.md
+prompt.md
+UI设计语言规范.md
+
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
