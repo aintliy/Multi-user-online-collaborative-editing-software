@@ -7,7 +7,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/collab_editing_db
     username: postgres
-    password: 123456
+    password: yourpassword
   
   # 关闭 Spring Boot 内置的 SQL 初始化依赖处理，避免与 MyBatis-Plus 在 Spring Boot 3.5.x 下的兼容性问题
   sql:
