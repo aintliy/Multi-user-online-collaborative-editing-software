@@ -47,15 +47,17 @@ public class DocumentController {
     }
 
     /**
-     * 获取文档列表（分页）
-     * GET /api/documents?page=1&size=10
+     * 获取文档列表（分页，支持搜索）
+     * GET /api/documents?page=1&size=10&keyword=xxx&type=doc
      */
     @GetMapping
     public Result<IPage<DocumentVO>> getDocumentList(@RequestParam(defaultValue = "1") int page,
                                                       @RequestParam(defaultValue = "10") int size,
+                                                      @RequestParam(required = false) String keyword,
+                                                      @RequestParam(required = false) String type,
                                                       Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        IPage<DocumentVO> documentPage = documentService.getDocumentList(userId, page, size);
+        IPage<DocumentVO> documentPage = documentService.getDocumentList(userId, page, size, keyword, type);
         return Result.success(documentPage);
     }
 

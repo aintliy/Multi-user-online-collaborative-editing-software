@@ -24,6 +24,17 @@ public enum ErrorCode {
     DOCUMENT_NOT_FOUND(3001, "文档不存在"),
     DOCUMENT_NO_PERMISSION(3002, "无权访问该文档"),
     DOCUMENT_VERSION_NOT_FOUND(3003, "文档版本不存在"),
+    
+    // 评论和通知相关 3500-3599
+    COMMENT_NOT_FOUND(3501, "评论不存在"),
+    NOTIFICATION_NOT_FOUND(3502, "通知不存在"),
+    
+    // 任务相关 3600-3699
+    TASK_NOT_FOUND(3601, "任务不存在"),
+    
+    // 角色权限相关 3700-3799
+    ROLE_NOT_FOUND(3701, "角色不存在"),
+    PERMISSION_NOT_FOUND(3702, "权限不存在"),
 
     // WebSocket 相关 4000-4999
     WS_CONNECTION_ERROR(4001, "WebSocket 连接非法"),

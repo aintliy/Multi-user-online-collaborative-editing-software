@@ -1,7 +1,9 @@
 package com.example.demo.dto;
 
-import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
+
+import lombok.Data;
 
 /**
  * 用户视图对象（不包含敏感信息）
@@ -22,6 +24,8 @@ public class UserVO {
     private String profile;
 
     private String status;
+    
+    private List<String> roles;
 
     private LocalDateTime createdAt;
 

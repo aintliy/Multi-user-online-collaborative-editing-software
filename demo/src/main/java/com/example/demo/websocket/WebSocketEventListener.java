@@ -60,7 +60,7 @@ public class WebSocketEventListener {
         Principal principal = headerAccessor.getUser();
 
         if (principal != null && sessionId != null) {
-            Long userId = Long.parseLong(principal.getName());
+            Long userId = Long.valueOf(principal.getName());
             Long docId = sessionDocuments.remove(sessionId);
 
             if (docId != null) {

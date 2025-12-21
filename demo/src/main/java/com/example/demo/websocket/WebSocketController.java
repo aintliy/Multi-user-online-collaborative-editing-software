@@ -52,7 +52,7 @@ public class WebSocketController {
             return;
         }
 
-        Long userId = Long.parseLong(principal.getName());
+        Long userId = Long.valueOf(principal.getName());
         
         try {
             // 检查用户是否有权限访问文档
@@ -91,7 +91,7 @@ public class WebSocketController {
             return;
         }
 
-        Long userId = Long.parseLong(principal.getName());
+        Long userId = Long.valueOf(principal.getName());
         User user = userMapper.selectById(userId);
 
         // 广播编辑操作给其他用户
@@ -119,7 +119,7 @@ public class WebSocketController {
             return;
         }
 
-        Long userId = Long.parseLong(principal.getName());
+        Long userId = Long.valueOf(principal.getName());
         User user = userMapper.selectById(userId);
 
         // 设置光标颜色
@@ -148,7 +148,7 @@ public class WebSocketController {
             return;
         }
 
-        Long userId = Long.parseLong(principal.getName());
+        Long userId = Long.valueOf(principal.getName());
         User user = userMapper.selectById(userId);
 
         // 广播聊天消息
@@ -174,7 +174,7 @@ public class WebSocketController {
             return;
         }
 
-        Long userId = Long.parseLong(principal.getName());
+        Long userId = Long.valueOf(principal.getName());
         User user = userMapper.selectById(userId);
 
         // 用户离开文档
@@ -203,7 +203,7 @@ public class WebSocketController {
             return;
         }
 
-        Long userId = Long.parseLong(principal.getName());
+        Long userId = Long.valueOf(principal.getName());
         List<OnlineUser> onlineUsers = onlineUserManager.getOnlineUsers(docId);
 
         // 发送在线用户列表给请求者

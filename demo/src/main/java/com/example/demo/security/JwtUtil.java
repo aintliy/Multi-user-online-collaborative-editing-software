@@ -1,13 +1,17 @@
 package com.example.demo.security;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+import javax.crypto.SecretKey;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * JWT 工具类
@@ -43,7 +47,29 @@ public class JwtUtil {
      */
     public Long getUserIdFromToken(String token) {
         Claims claims = parseToken(token);
-        return Long.parseLong(claims.getSubject());
+        return Long.valueOf(claims.getSubject());
+    }
+
+    /**
+     * 从请求中提取用户 ID
+     */
+    public Long getUserIdFromRequest(HttpServletRequest request) {
+        String token = extractToken(request);
+        if (token == null) {
+            throw new IllegalArgumentException("Token not found in request");
+        }
+        return getUserIdFromToken(token);
+    }
+
+    /**
+     * 从请求头中提取 Token
+     */
+    private String extractToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
     }
 
     /**

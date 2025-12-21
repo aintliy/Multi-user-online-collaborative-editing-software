@@ -1,11 +1,23 @@
 package com.example.demo.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.ErrorCode;
-import com.example.demo.dto.*;
+import com.example.demo.dto.CreateDocumentRequest;
+import com.example.demo.dto.DocumentVO;
+import com.example.demo.dto.ShareDocumentRequest;
+import com.example.demo.dto.UpdateDocumentRequest;
 import com.example.demo.entity.Document;
 import com.example.demo.entity.DocumentPermission;
 import com.example.demo.entity.DocumentVersion;
@@ -14,14 +26,6 @@ import com.example.demo.mapper.DocumentMapper;
 import com.example.demo.mapper.DocumentPermissionMapper;
 import com.example.demo.mapper.DocumentVersionMapper;
 import com.example.demo.mapper.UserMapper;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 文档服务
@@ -70,9 +74,9 @@ public class DocumentService {
     }
 
     /**
-     * 获取文档列表（分页）
+     * 获取文档列表（分页，支持搜索）
      */
-    public IPage<DocumentVO> getDocumentList(Long userId, int pageNum, int pageSize) {
+    public IPage<DocumentVO> getDocumentList(Long userId, int pageNum, int pageSize, String keyword, String type) {
         Page<Document> page = new Page<>(pageNum, pageSize);
 
         // 查询用户拥有的文档 + 有权限访问的文档
@@ -81,6 +85,19 @@ public class DocumentService {
                .and(w -> w.eq(Document::getOwnerId, userId)
                           .or()
                           .in(Document::getId, getAccessibleDocumentIds(userId)));
+        
+        // 关键字搜索：标题和内容
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.and(w -> w.like(Document::getTitle, keyword)
+                              .or()
+                              .like(Document::getContent, keyword));
+        }
+        
+        // 文档类型筛选
+        if (type != null && !type.isEmpty()) {
+            wrapper.eq(Document::getDocType, type);
+        }
+        
         wrapper.orderByDesc(Document::getUpdatedAt);
 
         IPage<Document> documentPage = documentMapper.selectPage(page, wrapper);
