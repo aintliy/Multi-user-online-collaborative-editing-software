@@ -143,6 +143,42 @@ public class TaskService {
     }
     
     /**
+     * 获取用户的所有任务（列表形式）
+     */
+    public List<TaskVO> getMyTasksList(Long userId, String status) {
+        LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<Task>()
+            .eq(Task::getAssigneeId, userId)
+            .orderByDesc(Task::getCreatedAt);
+        
+        if (status != null && !status.isEmpty()) {
+            wrapper.eq(Task::getStatus, status);
+        }
+        
+        List<Task> tasks = taskMapper.selectList(wrapper);
+        
+        return tasks.stream()
+            .map(this::convertToVO)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * 获取任务详情
+     */
+    public TaskVO getTaskById(Long userId, Long taskId) {
+        Task task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        
+        // 只有任务负责人可以查看
+        if (!task.getAssigneeId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        
+        return convertToVO(task);
+    }
+    
+    /**
      * 更新任务
      */
     @Transactional(rollbackFor = Exception.class)

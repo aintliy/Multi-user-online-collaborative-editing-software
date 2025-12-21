@@ -1,19 +1,31 @@
 package com.example.demo.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.ErrorCode;
-import com.example.demo.dto.*;
-import com.example.demo.entity.*;
-import com.example.demo.mapper.*;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.example.demo.dto.PermissionVO;
+import com.example.demo.dto.RoleVO;
+import com.example.demo.dto.UserVO;
+import com.example.demo.entity.Permission;
+import com.example.demo.entity.Role;
+import com.example.demo.entity.RolePermission;
+import com.example.demo.entity.User;
+import com.example.demo.entity.UserRole;
+import com.example.demo.mapper.PermissionMapper;
+import com.example.demo.mapper.RoleMapper;
+import com.example.demo.mapper.RolePermissionMapper;
+import com.example.demo.mapper.UserMapper;
+import com.example.demo.mapper.UserRoleMapper;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -70,7 +82,7 @@ public class RoleService {
      * 更新角色的权限
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateRolePermissions(Long roleId, UpdateRolePermissionsRequest request) {
+    public void updateRolePermissions(Long roleId, List<Long> permissionIds) {
         Role role = roleMapper.selectById(roleId);
         if (role == null) {
             throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
@@ -83,16 +95,12 @@ public class RoleService {
         );
         
         // 添加新的权限关联
-        for (String permissionCode : request.getPermissionCodes()) {
-            Permission permission = permissionMapper.selectOne(
-                new LambdaQueryWrapper<Permission>()
-                    .eq(Permission::getCode, permissionCode)
-            );
-            
+        for (Long permissionId : permissionIds) {
+            Permission permission = permissionMapper.selectById(permissionId);
             if (permission != null) {
                 RolePermission rolePermission = new RolePermission();
                 rolePermission.setRoleId(roleId);
-                rolePermission.setPermissionId(permission.getId());
+                rolePermission.setPermissionId(permissionId);
                 rolePermissionMapper.insert(rolePermission);
             }
         }
@@ -123,7 +131,7 @@ public class RoleService {
      * 更新用户的角色
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateUserRoles(Long userId, UpdateUserRolesRequest request) {
+    public void updateUserRoles(Long userId, List<Long> roleIds) {
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -136,16 +144,12 @@ public class RoleService {
         );
         
         // 添加新的角色关联
-        for (String roleCode : request.getRoleCodes()) {
-            Role role = roleMapper.selectOne(
-                new LambdaQueryWrapper<Role>()
-                    .eq(Role::getCode, roleCode)
-            );
-            
+        for (Long roleId : roleIds) {
+            Role role = roleMapper.selectById(roleId);
             if (role != null) {
                 UserRole userRole = new UserRole();
                 userRole.setUserId(userId);
-                userRole.setRoleId(role.getId());
+                userRole.setRoleId(roleId);
                 userRoleMapper.insert(userRole);
             }
         }

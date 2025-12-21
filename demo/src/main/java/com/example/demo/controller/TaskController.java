@@ -1,16 +1,27 @@
 package com.example.demo.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import java.util.List;
+
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demo.common.Result;
-import com.example.demo.dto.*;
+import com.example.demo.dto.CreateTaskRequest;
+import com.example.demo.dto.TaskVO;
+import com.example.demo.dto.UpdateTaskRequest;
 import com.example.demo.security.JwtUtil;
 import com.example.demo.service.TaskService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api")
@@ -21,15 +32,14 @@ public class TaskController {
     private final JwtUtil jwtUtil;
     
     /**
-     * 在文档中创建任务
+     * 创建任务
      */
-    @PostMapping("/documents/{documentId}/tasks")
+    @PostMapping("/tasks")
     public Result<TaskVO> createTask(
-            @PathVariable Long documentId,
             @Validated @RequestBody CreateTaskRequest request,
             HttpServletRequest httpRequest) {
         Long userId = jwtUtil.getUserIdFromRequest(httpRequest);
-        TaskVO task = taskService.createTask(userId, documentId, request);
+        TaskVO task = taskService.createTask(userId, request.getDocumentId(), request);
         return Result.success(task);
     }
     
@@ -46,16 +56,14 @@ public class TaskController {
     }
     
     /**
-     * 获取我的任务列表（分页）
+     * 获取我的任务列表
      */
     @GetMapping("/tasks/my")
-    public Result<IPage<TaskVO>> getMyTasks(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
+    public Result<List<TaskVO>> getMyTasks(
             @RequestParam(required = false) String status,
             HttpServletRequest httpRequest) {
         Long userId = jwtUtil.getUserIdFromRequest(httpRequest);
-        IPage<TaskVO> tasks = taskService.getMyTasks(userId, page, size, status);
+        List<TaskVO> tasks = taskService.getMyTasksList(userId, status);
         return Result.success(tasks);
     }
     

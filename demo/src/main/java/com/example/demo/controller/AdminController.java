@@ -54,11 +54,10 @@ public class AdminController {
     /**
      * 更新用户的角色
      */
-    @PutMapping("/users/{userId}/roles")
+    @PutMapping("/users/roles")
     public Result<Void> updateUserRoles(
-            @PathVariable Long userId,
             @Validated @RequestBody UpdateUserRolesRequest request) {
-        roleService.updateUserRoles(userId, request);
+        roleService.updateUserRoles(request.getUserId(), request.getRoleIds());
         return Result.success(null);
     }
     
@@ -95,11 +94,10 @@ public class AdminController {
     /**
      * 更新角色的权限
      */
-    @PutMapping("/roles/{roleId}/permissions")
+    @PutMapping("/roles/permissions")
     public Result<Void> updateRolePermissions(
-            @PathVariable Long roleId,
             @Validated @RequestBody UpdateRolePermissionsRequest request) {
-        roleService.updateRolePermissions(roleId, request);
+        roleService.updateRolePermissions(request.getRoleId(), request.getPermissionIds());
         return Result.success(null);
     }
     

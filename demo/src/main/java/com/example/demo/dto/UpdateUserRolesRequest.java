@@ -3,10 +3,14 @@ package com.example.demo.dto;
 import java.util.List;
 
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class UpdateUserRolesRequest {
+    @NotNull(message = "用户ID不能为空")
+    private Long userId;
+    
     @NotEmpty(message = "角色列表不能为空")
-    private List<String> roleCodes;
+    private List<Long> roleIds;
 }

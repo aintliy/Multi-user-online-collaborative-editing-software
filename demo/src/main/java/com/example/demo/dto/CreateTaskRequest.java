@@ -13,6 +13,8 @@ public class CreateTaskRequest {
     
     private String description;
     
+    private Long documentId;
+    
     @NotNull(message = "分配人不能为空")
     private Long assigneeId;
     
