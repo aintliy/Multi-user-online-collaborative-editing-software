@@ -1,14 +1,5 @@
 HELP.md
-编码规范与项目结构.md
-多人在线协作编辑软件.md
-架构设计说明.md
-接口设计文档.md
-开发日志.md
-前端页面与路由设计.md
-数据库设计.md
-用例说明.md
-prompt.md
-UI设计语言规范.md
+*.md
 
 target/
 .mvn/wrapper/maven-wrapper.jar
@@ -43,6 +34,3 @@ build/
 ### VS Code ###
 .vscode/
 
-功能实现完成总结_备份_20251221_172447.md
-功能实现完成总结.md
-前后端接口对应验证.md

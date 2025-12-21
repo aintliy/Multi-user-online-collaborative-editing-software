@@ -13,12 +13,14 @@ public enum ErrorCode {
     PARAM_ERROR(1001, "参数校验失败"),
     AUTH_ERROR(1002, "认证失败（未登录或 token 失效）"),
     FORBIDDEN(1003, "权限不足"),
+    TOO_MANY_REQUESTS(1004, "访问过于频繁，请稍后重试"),
 
     // 用户相关 2000-2999
     USER_NOT_FOUND(2001, "用户不存在"),
     USER_ALREADY_EXISTS(2002, "邮箱/手机号已被注册"),
     USER_PASSWORD_ERROR(2003, "密码错误"),
     USER_DISABLED(2004, "账号已被禁用"),
+    INVALID_TOKEN(2005, "令牌无效或已过期"),
 
     // 文档相关 3000-3999
     DOCUMENT_NOT_FOUND(3001, "文档不存在"),

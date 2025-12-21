@@ -236,5 +236,24 @@ CREATE INDEX idx_op_logs_action ON operation_logs(action);
 CREATE INDEX idx_op_logs_created ON operation_logs(created_at);
 
 -- =====================================================
+-- 13. 密码重置令牌表 password_reset_tokens
+-- =====================================================
+CREATE TABLE password_reset_tokens (
+  id           BIGSERIAL PRIMARY KEY,
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token        VARCHAR(255) NOT NULL UNIQUE,
+  expires_at   TIMESTAMPTZ NOT NULL,
+  used         BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE password_reset_tokens IS '密码重置令牌表';
+COMMENT ON COLUMN password_reset_tokens.token IS '重置令牌（UUID）';
+COMMENT ON COLUMN password_reset_tokens.used IS '是否已使用';
+CREATE INDEX idx_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX idx_reset_tokens_user ON password_reset_tokens(user_id);
+CREATE INDEX idx_reset_tokens_expires ON password_reset_tokens(expires_at);
+
+-- =====================================================
 -- 初始化完成
 -- =====================================================

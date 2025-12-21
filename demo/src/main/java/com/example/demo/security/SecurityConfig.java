@@ -37,8 +37,10 @@ public class SecurityConfig {
                 
                 // 配置路径权限
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()  // 认证接口公开
+                        .requestMatchers("/api/auth/register", "/api/auth/login", 
+                                       "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()  // 认证接口公开
                         .requestMatchers("/ws/**").permitAll()        // WebSocket 公开
+                        .requestMatchers("/uploads/**").permitAll()   // 静态资源公开
                         .anyRequest().authenticated()                 // 其他接口需要认证
                 )
                 
