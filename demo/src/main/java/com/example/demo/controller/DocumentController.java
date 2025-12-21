@@ -48,16 +48,23 @@ public class DocumentController {
 
     /**
      * 获取文档列表（分页，支持搜索）
-     * GET /api/documents?page=1&size=10&keyword=xxx&type=doc
+     * GET /api/documents?page=1&size=10&keyword=xxx&type=doc&tags=标签1,标签2&ownerId=1&startDate=2025-01-01&endDate=2025-12-31&sortBy=updatedAt&sortOrder=desc
      */
     @GetMapping
     public Result<IPage<DocumentVO>> getDocumentList(@RequestParam(defaultValue = "1") int page,
                                                       @RequestParam(defaultValue = "10") int size,
                                                       @RequestParam(required = false) String keyword,
                                                       @RequestParam(required = false) String type,
+                                                      @RequestParam(required = false) String tags,
+                                                      @RequestParam(required = false) Long ownerId,
+                                                      @RequestParam(required = false) String startDate,
+                                                      @RequestParam(required = false) String endDate,
+                                                      @RequestParam(defaultValue = "updatedAt") String sortBy,
+                                                      @RequestParam(defaultValue = "desc") String sortOrder,
                                                       Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        IPage<DocumentVO> documentPage = documentService.getDocumentList(userId, page, size, keyword, type);
+        IPage<DocumentVO> documentPage = documentService.getDocumentList(
+            userId, page, size, keyword, type, tags, ownerId, startDate, endDate, sortBy, sortOrder);
         return Result.success(documentPage);
     }
 
@@ -120,5 +127,31 @@ public class DocumentController {
         Long userId = (Long) authentication.getPrincipal();
         List<DocumentVersion> versions = documentService.getVersions(userId, id);
         return Result.success(versions);
+    }
+
+    /**
+     * 获取文档版本详情
+     * GET /api/documents/{id}/versions/{versionId}
+     */
+    @GetMapping("/{id}/versions/{versionId}")
+    public Result<DocumentVersion> getVersionDetail(@PathVariable Long id,
+                                                     @PathVariable Long versionId,
+                                                     Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        DocumentVersion version = documentService.getVersionDetail(userId, id, versionId);
+        return Result.success(version);
+    }
+
+    /**
+     * 回滚到指定版本
+     * POST /api/documents/{id}/versions/{versionId}/rollback
+     */
+    @PostMapping("/{id}/versions/{versionId}/rollback")
+    public Result<DocumentVO> rollbackVersion(@PathVariable Long id,
+                                               @PathVariable Long versionId,
+                                               Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        DocumentVO document = documentService.rollbackVersion(userId, id, versionId);
+        return Result.success("版本回滚成功", document);
     }
 }

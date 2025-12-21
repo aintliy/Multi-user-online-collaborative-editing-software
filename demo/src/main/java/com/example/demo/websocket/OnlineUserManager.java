@@ -123,4 +123,21 @@ public class OnlineUserManager {
         Map<Long, OnlineUser> users = documentUsers.get(documentId);
         return users != null ? users.size() : 0;
     }
+
+    /**
+     * 获取总在线用户数（所有文档）
+     */
+    public int getTotalOnlineCount() {
+        return (int) documentUsers.values().stream()
+                .flatMap(users -> users.keySet().stream())
+                .distinct()
+                .count();
+    }
+
+    /**
+     * 获取活跃文档数（有用户在线的文档数）
+     */
+    public int getActiveDocumentCount() {
+        return documentUsers.size();
+    }
 }

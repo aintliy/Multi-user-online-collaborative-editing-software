@@ -61,9 +61,9 @@ public class NotificationService {
     }
 
     /**
-     * 获取用户的通知列表（分页）
+     * 获取用户的通知列表（分页，支持类型过滤）
      */
-    public IPage<NotificationVO> getNotifications(Long userId, int pageNum, int pageSize, Boolean isRead) {
+    public IPage<NotificationVO> getNotifications(Long userId, int pageNum, int pageSize, Boolean isRead, String type) {
         Page<Notification> page = new Page<>(pageNum, pageSize);
 
         LambdaQueryWrapper<Notification> wrapper = new LambdaQueryWrapper<>();
@@ -71,6 +71,11 @@ public class NotificationService {
         
         if (isRead != null) {
             wrapper.eq(Notification::getIsRead, isRead);
+        }
+        
+        // 按类型筛选
+        if (type != null && !type.isEmpty()) {
+            wrapper.eq(Notification::getType, type);
         }
         
         wrapper.orderByDesc(Notification::getCreatedAt);

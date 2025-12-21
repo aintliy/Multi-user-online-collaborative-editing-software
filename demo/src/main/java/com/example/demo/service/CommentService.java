@@ -82,6 +82,22 @@ public class CommentService {
 
         commentMapper.insert(comment);
 
+        // 解析@提及的用户并发送通知
+        List<String> mentionedUsers = parseMentions(request.getContent());
+        for (String username : mentionedUsers) {
+            User mentionedUser = userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getUsername, username)
+            );
+            if (mentionedUser != null && !mentionedUser.getId().equals(userId)) {
+                notificationService.createNotification(
+                    mentionedUser.getId(),
+                    "MENTION",
+                    comment.getId(),
+                    "用户在文档《" + document.getTitle() + "》的评论中@了您"
+                );
+            }
+        }
+
         // 发送通知给文档所有者（如果不是自己评论自己的文档）
         if (!document.getOwnerId().equals(userId)) {
             notificationService.createNotification(
@@ -213,5 +229,31 @@ public class CommentService {
         }
 
         return vo;
+    }
+
+    /**
+     * 解析评论内容中的@提及
+     * 支持 @username 格式
+     */
+    private List<String> parseMentions(String content) {
+        List<String> mentions = new ArrayList<>();
+        if (content == null || content.isEmpty()) {
+            return mentions;
+        }
+
+        // 使用正则表达式匹配 @username 格式
+        // 支持中英文用户名、数字、下划线，长度3-20
+        String pattern = "@([a-zA-Z0-9\u4e00-\u9fa5_]{3,20})";
+        java.util.regex.Pattern r = java.util.regex.Pattern.compile(pattern);
+        java.util.regex.Matcher m = r.matcher(content);
+
+        while (m.find()) {
+            String username = m.group(1);
+            if (!mentions.contains(username)) {
+                mentions.add(username);
+            }
+        }
+
+        return mentions;
     }
 }

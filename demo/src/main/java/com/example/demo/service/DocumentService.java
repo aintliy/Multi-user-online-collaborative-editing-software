@@ -45,6 +45,9 @@ public class DocumentService {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private OperationLogService operationLogService;
+
     /**
      * 创建文档
      */
@@ -70,21 +73,29 @@ public class DocumentService {
         version.setCreatedAt(LocalDateTime.now());
         versionMapper.insert(version);
 
+        // 记录操作日志
+        operationLogService.log(userId, "CREATE_DOC", "DOC", document.getId(), 
+                                "创建文档：" + document.getTitle());
+
         return convertToVO(document, userId);
     }
 
     /**
-     * 获取文档列表（分页，支持搜索）
+     * 获取文档列表（分页，支持高级搜索）
      */
-    public IPage<DocumentVO> getDocumentList(Long userId, int pageNum, int pageSize, String keyword, String type) {
+    public IPage<DocumentVO> getDocumentList(Long userId, int pageNum, int pageSize, 
+                                              String keyword, String type, String tags,
+                                              Long ownerId, String startDate, String endDate,
+                                              String sortBy, String sortOrder) {
         Page<Document> page = new Page<>(pageNum, pageSize);
 
         // 查询用户拥有的文档 + 有权限访问的文档
+        List<Long> accessibleIds = getAccessibleDocumentIds(userId);
         LambdaQueryWrapper<Document> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Document::getStatus, "active")
                .and(w -> w.eq(Document::getOwnerId, userId)
                           .or()
-                          .in(Document::getId, getAccessibleDocumentIds(userId)));
+                          .in(!accessibleIds.isEmpty(), Document::getId, accessibleIds));
         
         // 关键字搜索：标题和内容
         if (keyword != null && !keyword.isEmpty()) {
@@ -98,7 +109,45 @@ public class DocumentService {
             wrapper.eq(Document::getDocType, type);
         }
         
-        wrapper.orderByDesc(Document::getUpdatedAt);
+        // 标签筛选（支持多标签，用逗号分隔）
+        if (tags != null && !tags.isEmpty()) {
+            String[] tagArray = tags.split(",");
+            for (String tag : tagArray) {
+                wrapper.like(Document::getTags, tag.trim());
+            }
+        }
+        
+        // 作者筛选
+        if (ownerId != null) {
+            wrapper.eq(Document::getOwnerId, ownerId);
+        }
+        
+        // 日期范围筛选
+        if (startDate != null && !startDate.isEmpty()) {
+            wrapper.ge(Document::getUpdatedAt, startDate);
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            wrapper.le(Document::getUpdatedAt, endDate);
+        }
+        
+        // 排序（支持按标题、创建时间、更新时间排序）
+        if ("asc".equalsIgnoreCase(sortOrder)) {
+            if ("title".equals(sortBy)) {
+                wrapper.orderByAsc(Document::getTitle);
+            } else if ("createdAt".equals(sortBy)) {
+                wrapper.orderByAsc(Document::getCreatedAt);
+            } else {
+                wrapper.orderByAsc(Document::getUpdatedAt);
+            }
+        } else {
+            if ("title".equals(sortBy)) {
+                wrapper.orderByDesc(Document::getTitle);
+            } else if ("createdAt".equals(sortBy)) {
+                wrapper.orderByDesc(Document::getCreatedAt);
+            } else {
+                wrapper.orderByDesc(Document::getUpdatedAt);
+            }
+        }
 
         IPage<Document> documentPage = documentMapper.selectPage(page, wrapper);
 
@@ -192,6 +241,10 @@ public class DocumentService {
         document.setStatus("deleted");
         document.setUpdatedAt(LocalDateTime.now());
         documentMapper.updateById(document);
+
+        // 记录操作日志
+        operationLogService.log(userId, "DELETE_DOC", "DOC", documentId, 
+                                "删除文档：" + document.getTitle());
     }
 
     /**
@@ -236,6 +289,10 @@ public class DocumentService {
             permission.setCreatedAt(LocalDateTime.now());
             permissionMapper.insert(permission);
         }
+
+        // 记录操作日志
+        operationLogService.log(userId, "UPDATE_PERMISSION", "DOC", request.getDocumentId(), 
+                                "分享文档给用户 " + request.getUserEmail() + "，权限：" + request.getRole());
     }
 
     /**
@@ -252,6 +309,70 @@ public class DocumentService {
                .orderByDesc(DocumentVersion::getVersionNo);
 
         return versionMapper.selectList(wrapper);
+    }
+
+    /**
+     * 获取文档版本详情
+     */
+    public DocumentVersion getVersionDetail(Long userId, Long documentId, Long versionId) {
+        // 检查权限
+        if (!hasPermission(userId, documentId)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
+        }
+
+        DocumentVersion version = versionMapper.selectById(versionId);
+        if (version == null || !version.getDocumentId().equals(documentId)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "版本不存在");
+        }
+
+        return version;
+    }
+
+    /**
+     * 回滚到指定版本
+     */
+    @Transactional
+    public DocumentVO rollbackVersion(Long userId, Long documentId, Long versionId) {
+        // 检查文档是否存在
+        Document document = documentMapper.selectById(documentId);
+        if (document == null || "deleted".equals(document.getStatus())) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+
+        // 检查编辑权限
+        String permission = getPermission(userId, documentId);
+        if (!"OWNER".equals(permission) && !"EDITOR".equals(permission)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
+        }
+
+        // 获取指定版本
+        DocumentVersion targetVersion = versionMapper.selectById(versionId);
+        if (targetVersion == null || !targetVersion.getDocumentId().equals(documentId)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "版本不存在");
+        }
+
+        // 将该版本内容设为当前内容
+        document.setContent(targetVersion.getContent());
+        document.setUpdatedAt(LocalDateTime.now());
+        documentMapper.updateById(document);
+
+        // 创建新版本记录（记录回滚操作）
+        LambdaQueryWrapper<DocumentVersion> versionWrapper = new LambdaQueryWrapper<>();
+        versionWrapper.eq(DocumentVersion::getDocumentId, documentId)
+                     .orderByDesc(DocumentVersion::getVersionNo)
+                     .last("LIMIT 1");
+        DocumentVersion lastVersion = versionMapper.selectOne(versionWrapper);
+        int nextVersionNo = lastVersion != null ? lastVersion.getVersionNo() + 1 : 1;
+
+        DocumentVersion newVersion = new DocumentVersion();
+        newVersion.setDocumentId(documentId);
+        newVersion.setVersionNo(nextVersionNo);
+        newVersion.setContent(targetVersion.getContent());
+        newVersion.setCreatedBy(userId);
+        newVersion.setCreatedAt(LocalDateTime.now());
+        versionMapper.insert(newVersion);
+
+        return convertToVO(document, userId);
     }
 
     /**

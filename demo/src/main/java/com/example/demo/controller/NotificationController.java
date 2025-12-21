@@ -26,16 +26,17 @@ public class NotificationController {
     private NotificationService notificationService;
 
     /**
-     * 获取通知列表（分页）
-     * GET /api/notifications?page=1&size=10&isRead=false
+     * 获取通知列表（分页，支持类型过滤）
+     * GET /api/notifications?page=1&size=10&isRead=false&type=COMMENT
      */
     @GetMapping
     public Result<IPage<NotificationVO>> getNotifications(@RequestParam(defaultValue = "1") int page,
                                                            @RequestParam(defaultValue = "10") int size,
                                                            @RequestParam(required = false) Boolean isRead,
+                                                           @RequestParam(required = false) String type,
                                                            Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        IPage<NotificationVO> notifications = notificationService.getNotifications(userId, page, size, isRead);
+        IPage<NotificationVO> notifications = notificationService.getNotifications(userId, page, size, isRead, type);
         return Result.success(notifications);
     }
 

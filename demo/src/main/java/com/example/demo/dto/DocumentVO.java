@@ -22,6 +22,10 @@ public class DocumentVO {
 
     private String docType;
 
+    private String tags;
+
+    private String folderId;
+
     private String status;
 
     private String permission;  // 当前用户对该文档的权限：OWNER / EDITOR / VIEWER

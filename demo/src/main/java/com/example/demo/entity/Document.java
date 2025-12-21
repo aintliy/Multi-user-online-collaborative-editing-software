@@ -26,6 +26,10 @@ public class Document {
 
     private String docType;  // doc / sheet / slide
 
+    private String tags;     // 标签，逗号分隔
+
+    private String folderId; // 文件夹ID（可选）
+
     private String status;   // active / deleted
 
     private LocalDateTime createdAt;
