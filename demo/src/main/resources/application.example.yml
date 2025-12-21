@@ -5,7 +5,7 @@ spring:
   # 数据库配置（PostgreSQL）
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/collab_editing_db
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=collab_editing_db&stringtype=unspecified
     username: postgres
     password: yourpassword
   

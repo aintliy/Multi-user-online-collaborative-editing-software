@@ -258,3 +258,69 @@ CREATE INDEX idx_reset_tokens_expires ON password_reset_tokens(expires_at);
 -- =====================================================
 -- 初始化完成
 -- =====================================================
+
+
+-- 修复 TIMESTAMPTZ 到 TIMESTAMP 的类型转换问题
+-- 解决 PostgreSQL TIMESTAMPTZ 与 Java LocalDateTime 的兼容性问题
+
+-- 1. 用户表
+ALTER TABLE users 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
+
+-- 2. 角色表
+ALTER TABLE roles 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
+
+-- 3. 权限表
+ALTER TABLE permissions 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
+
+-- 4. 用户-角色关系表
+ALTER TABLE user_roles 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 5. 角色-权限关系表
+ALTER TABLE role_permissions 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 6. 文档表
+ALTER TABLE documents 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
+
+-- 7. 文档版本表
+ALTER TABLE document_versions 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 8. 文档权限表
+ALTER TABLE document_permissions 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 9. 评论表
+ALTER TABLE comments 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
+
+-- 10. 通知表
+ALTER TABLE notifications 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 11. 任务表
+ALTER TABLE tasks 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
+
+-- 12. 操作日志表
+ALTER TABLE operation_logs 
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 13. 密码重置令牌表
+ALTER TABLE password_reset_tokens 
+  ALTER COLUMN expires_at TYPE TIMESTAMP USING expires_at AT TIME ZONE 'UTC',
+  ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
+
+-- 修复完成
+SELECT 'TIMESTAMPTZ to TIMESTAMP migration completed' AS status;
