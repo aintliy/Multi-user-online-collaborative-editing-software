@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import AppLayout from '@/components/AppLayout';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,7 +29,9 @@ export default function RootLayout({
       >
         <ConfigProvider locale={zhCN}>
           <AuthProvider>
-            {children}
+            <AppLayout>
+              {children}
+            </AppLayout>
           </AuthProvider>
         </ConfigProvider>
       </body>

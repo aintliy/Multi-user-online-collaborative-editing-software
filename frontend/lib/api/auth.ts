@@ -25,6 +25,7 @@ export interface UserVO {
   avatarUrl?: string;
   profile?: string;
   status: string;
+  roles?: string[];
   createdAt: string;
   updatedAt: string;
 }

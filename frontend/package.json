@@ -10,12 +10,15 @@
   },
   "dependencies": {
     "@stomp/stompjs": "^7.2.1",
+    "@types/sockjs-client": "^1.5.4",
     "antd": "^6.1.1",
     "axios": "^1.13.2",
+    "dayjs": "^1.11.19",
     "next": "16.1.0",
     "quill-react-commercial": "^1.6.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-quill": "^2.0.0",
     "sockjs-client": "^1.6.1"
   },
   "devDependencies": {

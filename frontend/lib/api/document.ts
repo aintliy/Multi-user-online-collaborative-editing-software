@@ -52,6 +52,9 @@ export const getDocument = (id: number): Promise<Document> => {
   return api.get(`/api/documents/${id}`);
 };
 
+// 获取文档详情（别名）
+export const getDocumentById = getDocument;
+
 // 更新文档
 export const updateDocument = (id: number, data: UpdateDocumentRequest): Promise<Document> => {
   return api.put(`/api/documents/${id}`, data);
