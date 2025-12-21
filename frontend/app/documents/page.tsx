@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Table, Space, Modal, Form, Input, message, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { Button, Table, Space, Modal, Form, Input, Select, message, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ShareAltOutlined, SearchOutlined } from '@ant-design/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getDocuments,
@@ -13,6 +13,8 @@ import {
   CreateDocumentRequest,
   PageResult,
 } from '@/lib/api/document';
+
+const { Option } = Select;
 
 export default function DocumentsPage() {
   const router = useRouter();
@@ -24,15 +26,22 @@ export default function DocumentsPage() {
   const [pageSize] = useState(10);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [filterType, setFilterType] = useState<string | undefined>();
 
   useEffect(() => {
     fetchDocuments();
-  }, [currentPage]);
+  }, [currentPage, searchKeyword, filterType]);
 
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const result: PageResult<Document> = await getDocuments(currentPage, pageSize);
+      // 构建查询参数
+      const params: any = { page: currentPage, size: pageSize };
+      if (searchKeyword) params.keyword = searchKeyword;
+      if (filterType) params.type = filterType;
+      
+      const result: PageResult<Document> = await getDocuments(params.page, params.size);
       setDocuments(result.records);
       setTotal(result.total);
     } catch (error: any) {

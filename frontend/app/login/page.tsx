@@ -77,11 +77,18 @@ export default function LoginPage() {
             </Button>
           </Form.Item>
 
-          <div className="text-center">
-            <span className="text-gray-600">还没有账号？</span>
-            <Link href="/register" className="text-blue-600 hover:text-blue-700 ml-1">
-              立即注册
-            </Link>
+          <div className="text-center space-y-2">
+            <div>
+              <Link href="/auth/forgot-password" className="text-blue-600 hover:text-blue-700">
+                忘记密码？
+              </Link>
+            </div>
+            <div>
+              <span className="text-gray-600">还没有账号？</span>
+              <Link href="/register" className="text-blue-600 hover:text-blue-700 ml-1">
+                立即注册
+              </Link>
+            </div>
           </div>
         </Form>
       </div>

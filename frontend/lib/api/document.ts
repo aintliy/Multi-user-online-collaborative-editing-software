@@ -66,11 +66,30 @@ export const deleteDocument = (id: number): Promise<void> => {
 };
 
 // 分享文档
-export const shareDocument = (data: ShareDocumentRequest): Promise<void> => {
-  return api.post('/api/documents/share', data);
+export const shareDocument = (documentId: number, data: { userEmail: string; role: string }): Promise<void> => {
+  return api.post('/api/documents/share', {
+    documentId,
+    userEmail: data.userEmail,
+    role: data.role,
+  });
+};
+
+// 获取文档权限列表
+export const getDocumentPermissions = (id: number): Promise<any[]> => {
+  return api.get(`/api/documents/${id}/permissions`);
 };
 
 // 获取文档版本列表
 export const getDocumentVersions = (id: number): Promise<any[]> => {
   return api.get(`/api/documents/${id}/versions`);
+};
+
+// 获取文档版本详情
+export const getDocumentVersionDetail = (documentId: number, versionId: number): Promise<any> => {
+  return api.get(`/api/documents/${documentId}/versions/${versionId}`);
+};
+
+// 回滚文档到指定版本
+export const rollbackVersion = (documentId: number, versionId: number): Promise<void> => {
+  return api.post(`/api/documents/${documentId}/versions/${versionId}/rollback`);
 };

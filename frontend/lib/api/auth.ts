@@ -49,3 +49,24 @@ export const getCurrentUser = (): Promise<UserVO> => {
 export const logout = (): Promise<void> => {
   return api.post('/api/auth/logout');
 };
+
+// 忘记密码
+export const forgotPassword = (email: string): Promise<void> => {
+  return api.post('/api/auth/forgot-password', { email });
+};
+
+// 重置密码
+export const resetPassword = (data: { token: string; newPassword: string }): Promise<void> => {
+  return api.post('/api/auth/reset-password', data);
+};
+
+// 更新用户资料
+export interface UpdateProfileRequest {
+  username?: string;
+  phone?: string;
+  profile?: string;
+}
+
+export const updateProfile = (data: UpdateProfileRequest): Promise<UserVO> => {
+  return api.put('/api/auth/profile', data);
+};

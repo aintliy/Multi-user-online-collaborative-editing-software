@@ -44,7 +44,7 @@ export default function NotificationBell() {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const result = await getNotifications(1, 10);
+      const result = await getNotifications({ page: 1, size: 10 });
       setNotifications(result.records);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);

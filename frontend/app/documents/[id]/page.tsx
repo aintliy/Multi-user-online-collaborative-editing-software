@@ -22,6 +22,8 @@ import {
   UsergroupAddOutlined,
   CommentOutlined,
   ArrowLeftOutlined,
+  HistoryOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDocumentById, updateDocument, Document } from '@/lib/api/document';
@@ -54,6 +56,7 @@ export default function DocumentEditPage() {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [comments, setComments] = useState<CommentVO[]>([]);
   const [commentDrawerVisible, setCommentDrawerVisible] = useState(false);
+  const [versionDrawerVisible, setVersionDrawerVisible] = useState(false);
   const [newComment, setNewComment] = useState('');
 
   const quillRef = useRef<any>(null);
@@ -247,6 +250,40 @@ export default function DocumentEditPage() {
           </Space>
 
           <Space>
+            <Badge count={onlineUsers.length} showZero>
+              <Button
+                icon={<UsergroupAddOutlined />}
+                onClick={() => {/* 显示在线用户列表 */}}
+              >
+                在线用户
+              </Button>
+            </Badge>
+
+            <Badge count={comments.length} showZero>
+              <Button
+                icon={<CommentOutlined />}
+                onClick={() => setCommentDrawerVisible(true)}
+              >
+                评论
+              </Button>
+            </Badge>
+
+            {document?.permission === 'OWNER' && (
+              <Button
+                icon={<ShareAltOutlined />}
+                onClick={() => router.push(`/documents/${docId}/share`)}
+              >
+                权限设置
+              </Button>
+            )}
+
+            <Button
+              icon={<HistoryOutlined />}
+              onClick={() => setVersionDrawerVisible(true)}
+            >
+              版本历史
+            </Button>
+
             <Button
               type="primary"
               icon={<SaveOutlined />}
@@ -255,19 +292,6 @@ export default function DocumentEditPage() {
             >
               保存
             </Button>
-            <Badge count={onlineUsers.length}>
-              <Button icon={<UsergroupAddOutlined />}>
-                在线用户
-              </Button>
-            </Badge>
-            <Badge count={comments.length}>
-              <Button
-                icon={<CommentOutlined />}
-                onClick={() => setCommentDrawerVisible(true)}
-              >
-                评论
-              </Button>
-            </Badge>
           </Space>
         </div>
       </Header>
@@ -354,6 +378,22 @@ export default function DocumentEditPage() {
             )}
           />
         </Space>
+      </Drawer>
+
+      {/* 版本历史抽屉 */}
+      <Drawer
+        title="版本历史"
+        placement="right"
+        width={500}
+        onClose={() => setVersionDrawerVisible(false)}
+        open={versionDrawerVisible}
+      >
+        <div className="text-center py-8 text-gray-500">
+          <HistoryOutlined style={{ fontSize: 48, marginBottom: 16 }} />
+          <p>版本历史功能</p>
+          <p className="text-sm">此功能将显示文档的历史版本记录</p>
+          <p className="text-sm">支持查看版本详情和回滚操作</p>
+        </div>
       </Drawer>
     </Layout>
   );

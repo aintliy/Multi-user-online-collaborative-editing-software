@@ -22,14 +22,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
 
   useEffect(() => {
+    // 白名单路由：登录、注册、忘记密码、重置密码
+    const publicPaths = ['/login', '/register', '/auth/forgot-password', '/auth/reset-password', '/'];
+    const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+    
     // 检查是否登录
-    if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+    if (!user && !isPublicPath) {
       router.push('/login');
     }
-  }, [user, pathname]);
+  }, [user, pathname, router]);
 
-  // 如果是登录/注册页面，不显示导航
-  if (pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/') {
+  // 如果是公开页面，不显示导航
+  if (pathname.startsWith('/login') || pathname.startsWith('/register') || 
+      pathname.startsWith('/auth/') || pathname === '/') {
     return <>{children}</>;
   }
 
@@ -69,6 +74,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 key: '/admin/roles',
                 label: '角色权限',
               },
+              {
+                key: '/admin/monitor',
+                label: '系统监控',
+              },
             ],
           },
         ]
@@ -80,6 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       key: 'profile',
       icon: <UserOutlined />,
       label: '个人中心',
+      onClick: () => router.push('/profile'),
     },
     {
       type: 'divider' as const,

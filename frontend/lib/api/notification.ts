@@ -26,13 +26,19 @@ export interface PageResult<T> {
 /**
  * 获取通知列表（分页）
  */
-export const getNotifications = async (
-  page: number = 1,
-  size: number = 10,
-  isRead?: boolean
-): Promise<PageResult<NotificationVO>> => {
+export const getNotifications = async (params: {
+  page?: number;
+  size?: number;
+  isRead?: boolean;
+  type?: string;
+}): Promise<PageResult<NotificationVO>> => {
   const response = await axiosInstance.get('/api/notifications', {
-    params: { page, size, isRead },
+    params: {
+      page: params.page || 1,
+      size: params.size || 10,
+      isRead: params.isRead,
+      type: params.type,
+    },
   });
   return response.data.data;
 };
