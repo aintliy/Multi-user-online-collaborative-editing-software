@@ -68,6 +68,13 @@
 			<version>3.5.5</version>
 		</dependency>
 
+		<!-- 显式使用支持 Spring 6.x 的 mybatis-spring 3.x，避免 factoryBeanObjectType 类型不兼容问题 -->
+		<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis-spring</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+
 		<!-- JWT -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
