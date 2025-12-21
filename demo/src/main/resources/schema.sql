@@ -1,3 +1,4 @@
+-- Active: 1766324267089@@127.0.0.1@5432@postgres@collab_editing_db
 -- 多人在线协作编辑软件 PostgreSQL 数据库初始化脚本
 -- 基于《数据库设计.md》规范
 
