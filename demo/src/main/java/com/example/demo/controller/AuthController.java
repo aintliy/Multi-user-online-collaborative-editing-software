@@ -1,5 +1,7 @@
 package com.example.demo.controller;
 
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.demo.common.BusinessException;
+import com.example.demo.common.ErrorCode;
 import com.example.demo.common.Result;
 import com.example.demo.dto.ForgotPasswordRequest;
 import com.example.demo.dto.LoginRequest;
@@ -35,6 +39,25 @@ public class AuthController {
 
     @Autowired
     private RateLimiter rateLimiter;
+
+    /**
+     * 发送注册验证码
+     * POST /api/auth/send-verification-code
+     */
+    @PostMapping("/send-verification-code")
+    public Result<Void> sendVerificationCode(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        if (email == null || email.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+        
+        // 频率限制：同一邮箱5分钟内最多3次
+        String rateLimitKey = "reg_code_limit:" + email;
+        rateLimiter.checkRateLimit(rateLimitKey, 3, 300);
+        
+        authService.sendVerificationCode(email);
+        return Result.success("验证码已发送", null);
+    }
 
     /**
      * 用户注册

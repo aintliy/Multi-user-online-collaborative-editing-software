@@ -1,10 +1,9 @@
 package com.example.demo.dto;
 
-import lombok.Data;
-
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
 
 /**
  * 用户注册请求 DTO
@@ -23,6 +22,9 @@ public class RegisterRequest {
     @NotBlank(message = "密码不能为空")
     @Size(min = 6, max = 20, message = "密码长度必须在 6-20 字符之间")
     private String password;
+
+    @NotBlank(message = "验证码不能为空")
+    private String verificationCode;
 
     private String phone;
 }

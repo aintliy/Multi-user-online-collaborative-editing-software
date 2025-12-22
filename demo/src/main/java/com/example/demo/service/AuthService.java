@@ -1,22 +1,31 @@
 package com.example.demo.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.demo.common.BusinessException;
-import com.example.demo.common.ErrorCode;
-import com.example.demo.dto.*;
-import com.example.demo.entity.PasswordResetToken;
-import com.example.demo.entity.User;
-import com.example.demo.mapper.PasswordResetTokenMapper;
-import com.example.demo.mapper.UserMapper;
-import com.example.demo.security.JwtUtil;
+import java.time.LocalDateTime;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.demo.common.BusinessException;
+import com.example.demo.common.ErrorCode;
+import com.example.demo.dto.ForgotPasswordRequest;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.LoginResponse;
+import com.example.demo.dto.RegisterRequest;
+import com.example.demo.dto.ResetPasswordRequest;
+import com.example.demo.dto.UpdateProfileRequest;
+import com.example.demo.dto.UserVO;
+import com.example.demo.entity.User;
+import com.example.demo.mapper.PasswordResetTokenMapper;
+import com.example.demo.mapper.UserMapper;
+import com.example.demo.security.JwtUtil;
 
 /**
  * 认证服务
@@ -42,10 +51,45 @@ public class AuthService {
     @Autowired
     private RedisPasswordResetService redisPasswordResetService;
 
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    /**
+     * 发送注册验证码
+     */
+    public void sendVerificationCode(String email) {
+        // 检查邮箱是否已注册
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getEmail, email);
+        if (userMapper.selectCount(wrapper) > 0) {
+            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
+        }
+
+        // 生成6位验证码
+        String code = String.format("%06d", new Random().nextInt(1000000));
+        
+        // 存入Redis，5分钟有效
+        String key = "reg_code:" + email;
+        redisTemplate.opsForValue().set(key, code, 5, TimeUnit.MINUTES);
+        
+        // 发送邮件
+        emailService.sendVerificationCodeEmail(email, code);
+    }
+
     /**
      * 用户注册
      */
     public UserVO register(RegisterRequest request) {
+        // 校验验证码
+        String key = "reg_code:" + request.getEmail();
+        String code = redisTemplate.opsForValue().get(key);
+        if (code == null || !code.equals(request.getVerificationCode())) {
+            throw new BusinessException(ErrorCode.VERIFICATION_CODE_ERROR);
+        }
+        
+        // 删除验证码
+        redisTemplate.delete(key);
+
         // 检查邮箱是否已存在
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getEmail, request.getEmail());

@@ -76,4 +76,22 @@ public class EmailService {
         
         sendSimpleEmail(to, subject, text);
     }
+
+    /**
+     * 发送注册验证码邮件
+     */
+    public void sendVerificationCodeEmail(String to, String code) {
+        String subject = "注册验证码 - 多人在线协作编辑系统";
+        
+        String text = String.format(
+            "您好，\n\n" +
+            "您的注册验证码为：%s\n\n" +
+            "该验证码5分钟内有效，请勿泄露给他人。\n\n" +
+            "此致\n" +
+            "多人在线协作编辑系统团队",
+            code
+        );
+        
+        sendSimpleEmail(to, subject, text);
+    }
 }

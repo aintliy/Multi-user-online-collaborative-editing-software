@@ -21,6 +21,7 @@ public enum ErrorCode {
     USER_PASSWORD_ERROR(2003, "密码错误"),
     USER_DISABLED(2004, "账号已被禁用"),
     INVALID_TOKEN(2005, "令牌无效或已过期"),
+    VERIFICATION_CODE_ERROR(2006, "验证码错误或已过期"),
 
     // 文档相关 3000-3999
     DOCUMENT_NOT_FOUND(3001, "文档不存在"),
