@@ -212,7 +212,7 @@ public class DocumentVersionService {
                 .eq(DocumentVersion::getVersionNo, version1)
         );
         
-        DocumentVersion v2 = documentVersionMapper.selectOne(
+        DocumentVersion v2 = versionMapper.selectOne(
             new LambdaQueryWrapper<DocumentVersion>()
                 .eq(DocumentVersion::getDocumentId, documentId)
                 .eq(DocumentVersion::getVersionNo, version2)

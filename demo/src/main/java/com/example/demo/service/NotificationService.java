@@ -1,19 +1,21 @@
 package com.example.demo.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.ErrorCode;
 import com.example.demo.dto.NotificationVO;
 import com.example.demo.entity.Notification;
 import com.example.demo.mapper.NotificationMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 通知服务
@@ -119,7 +121,7 @@ public class NotificationService {
         }
         
         // 检查通知所有权
-        if (!notification.getUserId().equals(userId)) {
+        if (!notification.getReceiverId().equals(userId)) {
             throw new BusinessException(ErrorCode.NOTIFICATION_NO_PERMISSION);
         }
         
@@ -149,7 +151,7 @@ public class NotificationService {
         vo.setType(notification.getType());
         vo.setContent(notification.getContent());
         vo.setReferenceId(notification.getReferenceId());
-        vo.setIsRead(notification.getIsRead());
+        vo.setIsRead    (notification.getIsRead());
         vo.setCreatedAt(notification.getCreatedAt());
         return vo;
     }

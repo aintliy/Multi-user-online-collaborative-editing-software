@@ -1,28 +1,33 @@
 package com.example.demo.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.ErrorCode;
-import com.example.demo.dto.*;
+import com.example.demo.dto.CreateDocumentRequest;
+import com.example.demo.dto.DocumentVO;
+import com.example.demo.dto.PageResponse;
+import com.example.demo.dto.UpdateDocumentRequest;
 import com.example.demo.entity.Document;
 import com.example.demo.entity.DocumentCollaborator;
 import com.example.demo.entity.User;
 import com.example.demo.mapper.DocumentCollaboratorMapper;
 import com.example.demo.mapper.DocumentMapper;
 import com.example.demo.mapper.UserMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
- * 文档服务实现（重构版）
+ * 文档服务实现
  */
 @Slf4j
 @Service

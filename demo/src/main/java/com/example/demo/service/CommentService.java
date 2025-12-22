@@ -1,5 +1,12 @@
 package com.example.demo.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -15,14 +22,9 @@ import com.example.demo.entity.User;
 import com.example.demo.mapper.CommentMapper;
 import com.example.demo.mapper.DocumentMapper;
 import com.example.demo.mapper.UserMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 评论服务
@@ -56,8 +58,8 @@ public class CommentService {
         }
         
         // 如果是回复，检查父评论是否存在
-        if (request.getParentId() != null) {
-            Comment parentComment = commentMapper.selectById(request.getParentId());
+        if (request.getReplyToCommentId() != null) {
+            Comment parentComment = commentMapper.selectById(request.getReplyToCommentId());
             if (parentComment == null) {
                 throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
             }
@@ -67,16 +69,16 @@ public class CommentService {
         comment.setDocumentId(request.getDocumentId());
         comment.setUserId(userId);
         comment.setContent(request.getContent());
-        comment.setParentId(request.getParentId());
-        comment.setIsResolved(false);
+        comment.setReplyToCommentId(request.getReplyToCommentId());
+        comment.setStatus("open");
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
         
         commentMapper.insert(comment);
         
         // 如果是回复，通知被回复的用户
-        if (request.getParentId() != null) {
-            Comment parentComment = commentMapper.selectById(request.getParentId());
+        if (request.getReplyToCommentId() != null) {
+            Comment parentComment = commentMapper.selectById(request.getReplyToCommentId());
             if (parentComment != null && !parentComment.getUserId().equals(userId)) {
                 notificationService.createNotification(
                     parentComment.getUserId(),
@@ -127,7 +129,7 @@ public class CommentService {
         
         LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Comment::getDocumentId, documentId);
-        wrapper.isNull(Comment::getParentId); // 只获取顶级评论
+        wrapper.isNull(Comment::getReplyToCommentId); // 只获取顶级评论
         wrapper.orderByDesc(Comment::getCreatedAt);
         
         IPage<Comment> result = commentMapper.selectPage(pageObj, wrapper);
@@ -150,7 +152,7 @@ public class CommentService {
     private List<CommentVO> getReplies(Long parentId) {
         List<Comment> replies = commentMapper.selectList(
             new LambdaQueryWrapper<Comment>()
-                .eq(Comment::getParentId, parentId)
+                .eq(Comment::getReplyToCommentId, parentId)
                 .orderByAsc(Comment::getCreatedAt)
         );
         
@@ -179,7 +181,7 @@ public class CommentService {
         commentMapper.deleteById(commentId);
         commentMapper.delete(
             new LambdaQueryWrapper<Comment>()
-                .eq(Comment::getParentId, commentId)
+                .eq(Comment::getReplyToCommentId, commentId)
         );
         
         // 记录操作日志
@@ -209,7 +211,7 @@ public class CommentService {
             throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
         }
         
-        comment.setIsResolved(true);
+        comment.setStatus("resolved");
         comment.setUpdatedAt(LocalDateTime.now());
         commentMapper.updateById(comment);
         
@@ -239,8 +241,9 @@ public class CommentService {
         vo.setDocumentId(comment.getDocumentId());
         vo.setUserId(comment.getUserId());
         vo.setContent(comment.getContent());
-        vo.setParentId(comment.getParentId());
-        vo.setIsResolved(comment.getIsResolved());
+        vo.setReplyToCommentId(comment.getReplyToCommentId());
+        vo.setRangeInfo(comment.getRangeInfo());
+        vo.setStatus(comment.getStatus());
         vo.setCreatedAt(comment.getCreatedAt());
         vo.setUpdatedAt(comment.getUpdatedAt());
         
@@ -248,6 +251,7 @@ public class CommentService {
         User user = userMapper.selectById(comment.getUserId());
         if (user != null) {
             vo.setUsername(user.getUsername());
+            vo.setAvatarUrl(user.getAvatarUrl());
         }
         
         return vo;

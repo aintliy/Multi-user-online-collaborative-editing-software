@@ -18,7 +18,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * JWT 认证过滤器（重构版：支持角色权限）
+ * JWT 认证过滤器（支持角色权限）
  * 拦截请求并验证 JWT Token
  */
 @Component

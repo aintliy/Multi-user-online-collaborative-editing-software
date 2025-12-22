@@ -1,15 +1,17 @@
-﻿package com.example.demo.dto;
+package com.example.demo.dto;
 
-import lombok.Data;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import java.time.LocalDate;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 /**
  * 创建任务请求DTO
  */
 @Data
 public class CreateTaskRequest {
+    @NotNull(message = "文档ID不能为空")
+    private Long relatedDocId;
     
     @NotBlank(message = "任务标题不能为空")
     private String title;
@@ -20,4 +22,5 @@ public class CreateTaskRequest {
     private Long assigneeId;
     
     private LocalDate dueDate;
+    private String priority;
 }

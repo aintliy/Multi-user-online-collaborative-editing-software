@@ -27,7 +27,7 @@ public class JwtUtil {
     }
 
     /**
-     * 生成 JWT Token（重构版：包含role）
+     * 生成 JWT Token（包含role）
      */
     public String generateToken(Long userId, String email, String role) {
         SecretKey key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
@@ -83,7 +83,7 @@ public class JwtUtil {
     }
     
     /**
-     * 从 Token 中获取角色（重构版新增）
+     * 从 Token 中获取角色（新增）
      */
     public String getRoleFromToken(String token) {
         Claims claims = parseToken(token);

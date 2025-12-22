@@ -1,5 +1,12 @@
 package com.example.demo.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -13,14 +20,9 @@ import com.example.demo.entity.Task;
 import com.example.demo.entity.User;
 import com.example.demo.mapper.TaskMapper;
 import com.example.demo.mapper.UserMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 任务服务
@@ -268,7 +270,7 @@ public class TaskService {
         vo.setStatus(task.getStatus());
         vo.setPriority(task.getPriority());
         vo.setDueDate(task.getDueDate());
-        vo.setRelatedDocId(task.getRelatedDocId());
+        vo.setDocumentId(task.getRelatedDocId());
         vo.setCreatedAt(task.getCreatedAt());
         vo.setUpdatedAt(task.getUpdatedAt());
         

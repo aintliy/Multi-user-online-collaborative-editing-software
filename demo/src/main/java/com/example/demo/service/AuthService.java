@@ -1,15 +1,9 @@
 package com.example.demo.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.demo.common.BusinessException;
-import com.example.demo.common.ErrorCode;
-import com.example.demo.dto.*;
-import com.example.demo.entity.User;
-import com.example.demo.mapper.UserMapper;
-import com.example.demo.security.JwtUtil;
-import com.example.demo.util.PublicIdGenerator;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -17,12 +11,27 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.demo.common.BusinessException;
+import com.example.demo.common.ErrorCode;
+import com.example.demo.dto.ForgotPasswordRequest;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.LoginResponse;
+import com.example.demo.dto.RegisterRequest;
+import com.example.demo.dto.ResetPasswordRequest;
+import com.example.demo.dto.SendVerificationCodeRequest;
+import com.example.demo.dto.UpdateProfileRequest;
+import com.example.demo.dto.UserVO;
+import com.example.demo.entity.User;
+import com.example.demo.mapper.UserMapper;
+import com.example.demo.security.JwtUtil;
+import com.example.demo.util.PublicIdGenerator;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * 认证服务实现（重构版）
+ * 认证服务实现
  * 严格按照接口设计文档实现
  */
 @Slf4j

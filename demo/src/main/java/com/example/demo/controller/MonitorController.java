@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 系统监控控制器（重构版）
+ * 系统监控控制器
  */
 @RestController
 @RequestMapping("/api/monitor")

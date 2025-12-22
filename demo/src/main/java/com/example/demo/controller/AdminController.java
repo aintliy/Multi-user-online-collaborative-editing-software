@@ -10,7 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 管理员控制器（重构版）
+ * 管理员控制器
  */
 @RestController
 @RequestMapping("/api/admin")

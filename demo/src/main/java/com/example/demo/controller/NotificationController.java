@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 通知控制器（重构版）
+ * 通知控制器
  */
 @RestController
 @RequestMapping("/api/notifications")

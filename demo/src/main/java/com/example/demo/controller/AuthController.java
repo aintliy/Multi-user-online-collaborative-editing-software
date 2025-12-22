@@ -1,15 +1,29 @@
 package com.example.demo.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demo.common.ApiResponse;
-import com.example.demo.dto.*;
+import com.example.demo.dto.ForgotPasswordRequest;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.LoginResponse;
+import com.example.demo.dto.RegisterRequest;
+import com.example.demo.dto.ResetPasswordRequest;
+import com.example.demo.dto.SendVerificationCodeRequest;
+import com.example.demo.dto.UpdateProfileRequest;
+import com.example.demo.dto.UserVO;
 import com.example.demo.service.AuthService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
 
 /**
- * 认证控制器（重构版）
+ * 认证控制器
  */
 @RestController
 @RequestMapping("/api/auth")

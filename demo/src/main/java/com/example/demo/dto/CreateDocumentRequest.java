@@ -1,7 +1,7 @@
 package com.example.demo.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-import javax.validation.constraints.NotBlank;
 
 /**
  * 创建文档请求DTO
