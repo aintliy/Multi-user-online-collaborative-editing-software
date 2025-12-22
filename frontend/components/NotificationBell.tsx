@@ -183,7 +183,7 @@ export default function NotificationBell() {
 
   return (
     <Dropdown
-      dropdownRender={dropdownRender}
+      popupRender={dropdownRender}
       trigger={['click']}
       open={dropdownOpen}
       onOpenChange={handleDropdownOpenChange}

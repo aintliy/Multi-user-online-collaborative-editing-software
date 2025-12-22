@@ -29,6 +29,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // 启用 CORS（使用 WebMvcConfig 中的配置）
+                .cors(cors -> {})
+                
                 // 禁用 CSRF（前后端分离项目通常禁用）
                 .csrf(csrf -> csrf.disable())
                 
