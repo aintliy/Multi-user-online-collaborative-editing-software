@@ -1,3 +1,4 @@
+-- Active: 1766324267089@@127.0.0.1@5432@postgres@collab_editing_db
 -- =====================================================
 -- 多人在线协作编辑软件 PostgreSQL 数据库架构
 -- 基于开发手册规范完全重构版本（2025-12-22）
@@ -39,7 +40,7 @@ CREATE TABLE users (
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_public_id ON users(public_id);
 
-COMMENT ON TABLE users IS '用户表（重构版）';
+COMMENT ON TABLE users IS '用户表';
 COMMENT ON COLUMN users.public_id IS '对外公开的随机不可变用户ID，用于搜索和仓库URL';
 COMMENT ON COLUMN users.role IS '系统角色：ADMIN-管理员，USER-普通用户';
 COMMENT ON COLUMN users.status IS '用户状态：active-正常，disabled-禁用';
@@ -67,7 +68,7 @@ CREATE INDEX idx_documents_visibility ON documents(visibility);
 CREATE INDEX idx_documents_forked     ON documents(forked_from_id);
 CREATE INDEX idx_documents_status     ON documents(status);
 
-COMMENT ON TABLE documents IS '文档表（重构版）';
+COMMENT ON TABLE documents IS '文档表';
 COMMENT ON COLUMN documents.visibility IS 'private-私有（仅所有者和协作者可见），public-公开（任何人可查看）';
 COMMENT ON COLUMN documents.forked_from_id IS '克隆来源文档ID，克隆后与原文档权限完全解耦';
 
@@ -290,4 +291,4 @@ VALUES
   ('u_admin001', 'admin', 'admin@example.com', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', 'ADMIN', 'active');
 -- 注意：上面的密码哈希是示例，实际应用需要重新生成
 
-COMMENT ON DATABASE postgres IS '多人在线协作编辑系统数据库（重构版）';
+COMMENT ON DATABASE postgres IS '多人在线协作编辑系统数据库';
