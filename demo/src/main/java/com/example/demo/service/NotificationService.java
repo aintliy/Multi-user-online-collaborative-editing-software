@@ -1,19 +1,15 @@
 package com.example.demo.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.demo.common.BusinessException;
+import com.example.demo.common.ErrorCode;
 import com.example.demo.dto.NotificationVO;
-import com.example.demo.entity.Comment;
-import com.example.demo.entity.Document;
 import com.example.demo.entity.Notification;
-import com.example.demo.mapper.CommentMapper;
-import com.example.demo.mapper.DocumentMapper;
 import com.example.demo.mapper.NotificationMapper;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,50 +18,34 @@ import java.util.stream.Collectors;
 /**
  * 通知服务
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
-
-    @Autowired
-    private NotificationMapper notificationMapper;
-
-    @Autowired
-    private DocumentMapper documentMapper;
-
-    @Autowired
-    private CommentMapper commentMapper;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
-
+    
+    private final NotificationMapper notificationMapper;
+    
     /**
      * 创建通知
      */
-    public void createNotification(Long receiverId, String type, Long referenceId, String content) {
+    public void createNotification(Long userId, String type, String content, Long relatedId) {
         Notification notification = new Notification();
-        notification.setReceiverId(receiverId);
+        notification.setReceiverId(userId);
         notification.setType(type);
-        notification.setReferenceId(referenceId);
         notification.setContent(content);
+        notification.setReferenceId(relatedId);
         notification.setIsRead(false);
         notification.setCreatedAt(LocalDateTime.now());
-
+        
         notificationMapper.insert(notification);
-
-        // 实时推送通知给用户（通过 WebSocket）
-        NotificationVO vo = convertToVO(notification);
-        messagingTemplate.convertAndSendToUser(
-                String.valueOf(receiverId),
-                "/queue/notifications",
-                vo
-        );
+        
+        log.info("创建通知: userId={}, type={}, content={}", userId, type, content);
     }
-
+    
     /**
-     * 获取用户的通知列表（分页，支持类型过滤）
+     * 获取用户通知列表
      */
-    public IPage<NotificationVO> getNotifications(Long userId, int pageNum, int pageSize, Boolean isRead, String type) {
-        Page<Notification> page = new Page<>(pageNum, pageSize);
-
+    public List<NotificationVO> getUserNotifications(Long userId, Boolean isRead, Integer limit) {
         LambdaQueryWrapper<Notification> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Notification::getReceiverId, userId);
         
@@ -73,90 +53,104 @@ public class NotificationService {
             wrapper.eq(Notification::getIsRead, isRead);
         }
         
-        // 按类型筛选
-        if (type != null && !type.isEmpty()) {
-            wrapper.eq(Notification::getType, type);
+        wrapper.orderByDesc(Notification::getCreatedAt);
+        
+        if (limit != null && limit > 0) {
+            wrapper.last("LIMIT " + limit);
         }
         
-        wrapper.orderByDesc(Notification::getCreatedAt);
-
-        IPage<Notification> notificationPage = notificationMapper.selectPage(page, wrapper);
-
-        // 转换为 VO
-        IPage<NotificationVO> voPage = new Page<>(notificationPage.getCurrent(), notificationPage.getSize(), notificationPage.getTotal());
-        List<NotificationVO> voList = notificationPage.getRecords().stream()
-                .map(this::convertToVO)
-                .collect(Collectors.toList());
-        voPage.setRecords(voList);
-
-        return voPage;
+        List<Notification> notifications = notificationMapper.selectList(wrapper);
+        
+        return notifications.stream()
+            .map(this::convertToNotificationVO)
+            .collect(Collectors.toList());
     }
-
-    /**
-     * 获取未读通知数量
-     */
-    public long getUnreadCount(Long userId) {
-        LambdaQueryWrapper<Notification> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Notification::getReceiverId, userId)
-               .eq(Notification::getIsRead, false);
-
-        return notificationMapper.selectCount(wrapper);
-    }
-
+    
     /**
      * 标记通知为已读
      */
-    public void markAsRead(Long userId, Long notificationId) {
+    @Transactional(rollbackFor = Exception.class)
+    public void markAsRead(Long notificationId, Long userId) {
         Notification notification = notificationMapper.selectById(notificationId);
-        if (notification != null && notification.getReceiverId().equals(userId)) {
+        if (notification == null) {
+            throw new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND);
+        }
+        
+        // 检查通知所有权
+        if (!notification.getReceiverId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOTIFICATION_NO_PERMISSION);
+        }
+        
+        if (!notification.getIsRead()) {
             notification.setIsRead(true);
             notificationMapper.updateById(notification);
+            
+            log.info("标记通知已读: notificationId={}, userId={}", notificationId, userId);
         }
     }
-
+    
     /**
-     * 标记所有通知为已读
+     * 批量标记已读
      */
+    @Transactional(rollbackFor = Exception.class)
     public void markAllAsRead(Long userId) {
-        LambdaQueryWrapper<Notification> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Notification::getReceiverId, userId)
-               .eq(Notification::getIsRead, false);
-
-        List<Notification> notifications = notificationMapper.selectList(wrapper);
-        for (Notification notification : notifications) {
+        List<Notification> unreadNotifications = notificationMapper.selectList(
+            new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getReceiverId, userId)
+                .eq(Notification::getIsRead, false)
+        );
+        
+        for (Notification notification : unreadNotifications) {
             notification.setIsRead(true);
             notificationMapper.updateById(notification);
         }
+        
+        log.info("批量标记已读: userId={}, count={}", userId, unreadNotifications.size());
     }
-
+    
     /**
      * 删除通知
      */
-    public void deleteNotification(Long userId, Long notificationId) {
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteNotification(Long notificationId, Long userId) {
         Notification notification = notificationMapper.selectById(notificationId);
-        if (notification != null && notification.getReceiverId().equals(userId)) {
-            notificationMapper.deleteById(notificationId);
+        if (notification == null) {
+            throw new BusinessException(ErrorCode.NOTIFICATION_NOT_FOUND);
         }
+        
+        // 检查通知所有权
+        if (!notification.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.NOTIFICATION_NO_PERMISSION);
+        }
+        
+        notificationMapper.deleteById(notificationId);
+        
+        log.info("删除通知: notificationId={}, userId={}", notificationId, userId);
     }
-
+    
     /**
-     * 实体转 VO
+     * 获取未读通知数量
      */
-    private NotificationVO convertToVO(Notification notification) {
+    public Long getUnreadCount(Long userId) {
+        return notificationMapper.selectCount(
+            new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getReceiverId, userId)
+                .eq(Notification::getIsRead, false)
+        );
+    }
+    
+    /**
+     * 转换为NotificationVO
+     */
+    private NotificationVO convertToNotificationVO(Notification notification) {
         NotificationVO vo = new NotificationVO();
-        BeanUtils.copyProperties(notification, vo);
-
-        // 根据类型设置扩展信息
-        if ("COMMENT".equals(notification.getType()) && notification.getReferenceId() != null) {
-            Comment comment = commentMapper.selectById(notification.getReferenceId());
-            if (comment != null) {
-                Document document = documentMapper.selectById(comment.getDocumentId());
-                if (document != null) {
-                    vo.setDocumentTitle(document.getTitle());
-                }
-            }
-        }
-
+        vo.setId(notification.getId());
+        vo.setReceiverId(notification.getReceiverId());
+        vo.setType(notification.getType());
+        vo.setContent(notification.getContent());
+        vo.setReferenceId(notification.getReferenceId());
+        vo.setIsRead(notification.getIsRead());
+        vo.setCreatedAt(notification.getCreatedAt());
         return vo;
     }
 }

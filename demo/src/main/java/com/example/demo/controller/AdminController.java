@@ -1,112 +1,92 @@
 package com.example.demo.controller;
 
-import java.util.List;
-import java.util.Map;
-
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.example.demo.common.Result;
-import com.example.demo.dto.PermissionVO;
-import com.example.demo.dto.RoleVO;
-import com.example.demo.dto.UpdateRolePermissionsRequest;
-import com.example.demo.dto.UpdateUserRolesRequest;
+import com.example.demo.common.ApiResponse;
+import com.example.demo.dto.PageResponse;
 import com.example.demo.dto.UserVO;
-import com.example.demo.service.RoleService;
-
+import com.example.demo.service.AdminService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
+/**
+ * 管理员控制器（重构版）
+ */
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
     
-    private final RoleService roleService;
+    private final AdminService adminService;
     
     /**
-     * 获取所有用户列表（分页）
+     * 获取用户列表
      */
     @GetMapping("/users")
-    public Result<IPage<UserVO>> getAllUsers(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
-        IPage<UserVO> users = roleService.getAllUsers(page, size, keyword);
-        return Result.success(users);
+    public ApiResponse<PageResponse<UserVO>> getUsers(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status) {
+        PageResponse<UserVO> users = adminService.getUsers(page, pageSize, keyword, role, status);
+        return ApiResponse.success(users);
     }
     
     /**
-     * 获取用户的角色列表
+     * 更新用户角色
      */
-    @GetMapping("/users/{userId}/roles")
-    public Result<List<RoleVO>> getUserRoles(@PathVariable Long userId) {
-        List<RoleVO> roles = roleService.getUserRoles(userId);
-        return Result.success(roles);
+    @PutMapping("/users/{userId}/role")
+    public ApiResponse<Void> updateUserRole(
+            @AuthenticationPrincipal Long adminId,
+            @PathVariable Long userId,
+            @RequestParam String role) {
+        adminService.updateUserRole(adminId, userId, role);
+        return ApiResponse.success();
     }
     
     /**
-     * 更新用户的角色
-     */
-    @PutMapping("/users/roles")
-    public Result<Void> updateUserRoles(
-            @Validated @RequestBody UpdateUserRolesRequest request) {
-        roleService.updateUserRoles(request.getUserId(), request.getRoleIds());
-        return Result.success(null);
-    }
-    
-    /**
-     * 禁用/启用用户
+     * 更新用户状态
      */
     @PutMapping("/users/{userId}/status")
-    public Result<Void> updateUserStatus(
+    public ApiResponse<Void> updateUserStatus(
+            @AuthenticationPrincipal Long adminId,
             @PathVariable Long userId,
-            @RequestBody Map<String, String> body) {
-        String status = body.get("status");
-        roleService.updateUserStatus(userId, status);
-        return Result.success(null);
+            @RequestParam String status) {
+        adminService.updateUserStatus(adminId, userId, status);
+        return ApiResponse.success();
     }
     
     /**
-     * 获取所有角色列表
+     * 删除用户
      */
-    @GetMapping("/roles")
-    public Result<List<RoleVO>> getAllRoles() {
-        List<RoleVO> roles = roleService.getAllRoles();
-        return Result.success(roles);
+    @DeleteMapping("/users/{userId}")
+    public ApiResponse<Void> deleteUser(
+            @AuthenticationPrincipal Long adminId,
+            @PathVariable Long userId) {
+        adminService.deleteUser(adminId, userId);
+        return ApiResponse.success();
     }
     
     /**
-     * 获取角色的权限列表
+     * 重置用户密码
      */
-    @GetMapping("/roles/{roleId}/permissions")
-    public Result<List<PermissionVO>> getRolePermissions(@PathVariable Long roleId) {
-        List<PermissionVO> permissions = roleService.getRolePermissions(roleId);
-        return Result.success(permissions);
+    @PostMapping("/users/{userId}/reset-password")
+    public ApiResponse<Void> resetUserPassword(
+            @AuthenticationPrincipal Long adminId,
+            @PathVariable Long userId,
+            @RequestParam String newPassword) {
+        adminService.resetUserPassword(adminId, userId, newPassword);
+        return ApiResponse.success();
     }
     
     /**
-     * 更新角色的权限
+     * 获取系统统计
      */
-    @PutMapping("/roles/permissions")
-    public Result<Void> updateRolePermissions(
-            @Validated @RequestBody UpdateRolePermissionsRequest request) {
-        roleService.updateRolePermissions(request.getRoleId(), request.getPermissionIds());
-        return Result.success(null);
-    }
-    
-    /**
-     * 获取所有权限列表
-     */
-    @GetMapping("/permissions")
-    public Result<List<PermissionVO>> getAllPermissions() {
-        List<PermissionVO> permissions = roleService.getAllPermissions();
-        return Result.success(permissions);
+    @GetMapping("/stats")
+    public ApiResponse<AdminService.SystemStatsVO> getSystemStats() {
+        AdminService.SystemStatsVO stats = adminService.getSystemStats();
+        return ApiResponse.success(stats);
     }
 }

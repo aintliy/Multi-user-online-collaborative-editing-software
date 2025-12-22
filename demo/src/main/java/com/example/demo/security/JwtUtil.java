@@ -27,9 +27,9 @@ public class JwtUtil {
     }
 
     /**
-     * 生成 JWT Token
+     * 生成 JWT Token（重构版：包含role）
      */
-    public String generateToken(Long userId, String email) {
+    public String generateToken(Long userId, String email, String role) {
         SecretKey key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getExpiration());
@@ -37,6 +37,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("email", email)
+                .claim("role", role)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -79,6 +80,14 @@ public class JwtUtil {
     public String getEmailFromToken(String token) {
         Claims claims = parseToken(token);
         return claims.get("email", String.class);
+    }
+    
+    /**
+     * 从 Token 中获取角色（重构版新增）
+     */
+    public String getRoleFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("role", String.class);
     }
 
     /**

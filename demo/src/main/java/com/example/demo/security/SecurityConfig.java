@@ -3,6 +3,7 @@ package com.example.demo.security;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -12,10 +13,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Spring Security 配置
+ * Spring Security 配置（重构版：启用方法级安全）
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Autowired
@@ -41,7 +43,8 @@ public class SecurityConfig {
                 // 配置路径权限
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/register", "/api/auth/login", 
-                                       "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()  // 认证接口公开
+                                       "/api/auth/forgot-password", "/api/auth/reset-password",
+                                       "/api/auth/send-verification-code").permitAll()  // 认证接口公开
                         .requestMatchers("/ws/**").permitAll()        // WebSocket 公开
                         .requestMatchers("/uploads/**").permitAll()   // 静态资源公开
                         .anyRequest().authenticated()                 // 其他接口需要认证

@@ -1,259 +1,255 @@
 package com.example.demo.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.ErrorCode;
 import com.example.demo.dto.CommentVO;
 import com.example.demo.dto.CreateCommentRequest;
+import com.example.demo.dto.DocumentVO;
+import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Comment;
 import com.example.demo.entity.Document;
 import com.example.demo.entity.User;
 import com.example.demo.mapper.CommentMapper;
 import com.example.demo.mapper.DocumentMapper;
 import com.example.demo.mapper.UserMapper;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * 评论服务
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class CommentService {
-
-    @Autowired
-    private CommentMapper commentMapper;
-
-    @Autowired
-    private DocumentMapper documentMapper;
-
-    @Autowired
-    private UserMapper userMapper;
-
-    @Autowired
-    private DocumentService documentService;
-
-    @Autowired
-    private NotificationService notificationService;
-
+    
+    private final CommentMapper commentMapper;
+    private final DocumentMapper documentMapper;
+    private final UserMapper userMapper;
+    private final DocumentService documentService;
+    private final NotificationService notificationService;
+    private final OperationLogService operationLogService;
+    
     /**
      * 创建评论
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CommentVO createComment(Long userId, CreateCommentRequest request) {
-        // 检查文档是否存在和权限
         Document document = documentMapper.selectById(request.getDocumentId());
-        if (document == null || "deleted".equals(document.getStatus())) {
+        if (document == null) {
             throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND);
         }
-
-        // 检查权限（必须有访问权限才能评论）
-        try {
-            documentService.getDocumentById(userId, request.getDocumentId());
-        } catch (BusinessException e) {
-            throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION, "无权在该文档评论");
+        
+        // 检查读权限
+        DocumentVO docVO = documentService.getDocumentById(request.getDocumentId(), userId);
+        if (docVO == null) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
         }
-
-        // 如果是回复评论，检查父评论是否存在
-        if (request.getReplyToCommentId() != null) {
-            Comment parentComment = commentMapper.selectById(request.getReplyToCommentId());
+        
+        // 如果是回复，检查父评论是否存在
+        if (request.getParentId() != null) {
+            Comment parentComment = commentMapper.selectById(request.getParentId());
             if (parentComment == null) {
-                throw new BusinessException(ErrorCode.PARAM_ERROR, "回复的评论不存在");
+                throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
             }
         }
-
-        // 创建评论
+        
         Comment comment = new Comment();
         comment.setDocumentId(request.getDocumentId());
         comment.setUserId(userId);
         comment.setContent(request.getContent());
-        comment.setReplyToCommentId(request.getReplyToCommentId());
-        comment.setRangeInfo(request.getRangeInfo());
-        comment.setStatus("open");
+        comment.setParentId(request.getParentId());
+        comment.setIsResolved(false);
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
-
+        
         commentMapper.insert(comment);
-
-        // 解析@提及的用户并发送通知
-        List<String> mentionedUsers = parseMentions(request.getContent());
-        for (String username : mentionedUsers) {
-            User mentionedUser = userMapper.selectOne(
-                new LambdaQueryWrapper<User>().eq(User::getUsername, username)
-            );
-            if (mentionedUser != null && !mentionedUser.getId().equals(userId)) {
-                notificationService.createNotification(
-                    mentionedUser.getId(),
-                    "MENTION",
-                    comment.getId(),
-                    "用户在文档《" + document.getTitle() + "》的评论中@了您"
-                );
-            }
-        }
-
-        // 发送通知给文档所有者（如果不是自己评论自己的文档）
-        if (!document.getOwnerId().equals(userId)) {
-            notificationService.createNotification(
-                    document.getOwnerId(),
-                    "COMMENT",
-                    comment.getId(),
-                    "用户在您的文档《" + document.getTitle() + "》中添加了评论"
-            );
-        }
-
+        
         // 如果是回复，通知被回复的用户
-        if (request.getReplyToCommentId() != null) {
-            Comment parentComment = commentMapper.selectById(request.getReplyToCommentId());
+        if (request.getParentId() != null) {
+            Comment parentComment = commentMapper.selectById(request.getParentId());
             if (parentComment != null && !parentComment.getUserId().equals(userId)) {
                 notificationService.createNotification(
-                        parentComment.getUserId(),
-                        "COMMENT",
-                        comment.getId(),
-                        "用户回复了您的评论"
+                    parentComment.getUserId(),
+                    "COMMENT_REPLY",
+                    "有人回复了你的评论",
+                    comment.getId()
+                );
+            }
+        } else {
+            // 如果是新评论，通知文档所有者
+            if (!document.getOwnerId().equals(userId)) {
+                notificationService.createNotification(
+                    document.getOwnerId(),
+                    "COMMENT_ADDED",
+                    "文档 " + document.getTitle() + " 有新评论",
+                    comment.getId()
                 );
             }
         }
-
-        return convertToVO(comment);
+        
+        // 记录操作日志
+        operationLogService.log(userId, "CREATE_COMMENT", "DOC", request.getDocumentId(), 
+            "添加评论");
+        
+        log.info("创建评论: commentId={}, docId={}, userId={}", 
+            comment.getId(), request.getDocumentId(), userId);
+        
+        return convertToCommentVO(comment);
     }
-
+    
     /**
-     * 获取文档的评论列表
+     * 获取文档评论列表
      */
-    public List<CommentVO> getCommentsByDocument(Long userId, Long documentId) {
-        // 检查权限
-        documentService.getDocumentById(userId, documentId);
-
-        // 查询所有评论
+    public PageResponse<CommentVO> getDocumentComments(Long documentId, Long userId, 
+                                                        Integer page, Integer pageSize) {
+        Document document = documentMapper.selectById(documentId);
+        if (document == null) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+        
+        // 检查读权限
+        DocumentVO docVO = documentService.getDocumentById(documentId, userId);
+        if (docVO == null) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
+        }
+        
+        Page<Comment> pageObj = new Page<>(page, pageSize);
+        
         LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Comment::getDocumentId, documentId)
-               .orderByDesc(Comment::getCreatedAt);
-
-        List<Comment> comments = commentMapper.selectList(wrapper);
-
-        // 转换为 VO 并构建树形结构
-        List<CommentVO> commentVOs = comments.stream()
-                .map(this::convertToVO)
-                .collect(Collectors.toList());
-
-        // 构建评论树（顶级评论 + 回复）
-        Map<Long, List<CommentVO>> replyMap = commentVOs.stream()
-                .filter(vo -> vo.getReplyToCommentId() != null)
-                .collect(Collectors.groupingBy(CommentVO::getReplyToCommentId));
-
-        List<CommentVO> topComments = commentVOs.stream()
-                .filter(vo -> vo.getReplyToCommentId() == null)
-                .collect(Collectors.toList());
-
-        // 设置回复
-        for (CommentVO comment : topComments) {
-            comment.setReplies(replyMap.getOrDefault(comment.getId(), new ArrayList<>()));
-        }
-
-        return topComments;
+        wrapper.eq(Comment::getDocumentId, documentId);
+        wrapper.isNull(Comment::getParentId); // 只获取顶级评论
+        wrapper.orderByDesc(Comment::getCreatedAt);
+        
+        IPage<Comment> result = commentMapper.selectPage(pageObj, wrapper);
+        
+        List<CommentVO> items = result.getRecords().stream()
+            .map(comment -> {
+                CommentVO vo = convertToCommentVO(comment);
+                // 加载回复
+                vo.setReplies(getReplies(comment.getId()));
+                return vo;
+            })
+            .collect(Collectors.toList());
+        
+        return new PageResponse<>(items, page, pageSize, result.getTotal());
     }
-
+    
     /**
-     * 解决评论（标记为已解决）
+     * 获取评论的回复
      */
-    public void resolveComment(Long userId, Long commentId) {
-        Comment comment = commentMapper.selectById(commentId);
-        if (comment == null) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "评论不存在");
-        }
-
-        // 检查权限（文档所有者或评论创建者可以解决评论）
-        Document document = documentMapper.selectById(comment.getDocumentId());
-        if (!document.getOwnerId().equals(userId) && !comment.getUserId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权解决该评论");
-        }
-
-        comment.setStatus("resolved");
-        comment.setUpdatedAt(LocalDateTime.now());
-        commentMapper.updateById(comment);
+    private List<CommentVO> getReplies(Long parentId) {
+        List<Comment> replies = commentMapper.selectList(
+            new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getParentId, parentId)
+                .orderByAsc(Comment::getCreatedAt)
+        );
+        
+        return replies.stream()
+            .map(this::convertToCommentVO)
+            .collect(Collectors.toList());
     }
-
+    
     /**
      * 删除评论
      */
-    public void deleteComment(Long userId, Long commentId) {
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteComment(Long commentId, Long userId) {
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "评论不存在");
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
-
-        // 检查权限（只有评论创建者或文档所有者可以删除）
+        
+        // 只有评论作者或文档所有者可以删除
         Document document = documentMapper.selectById(comment.getDocumentId());
         if (!comment.getUserId().equals(userId) && !document.getOwnerId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权删除该评论");
+            throw new BusinessException(ErrorCode.COMMENT_NO_PERMISSION);
         }
-
+        
+        // 删除评论及其所有回复
         commentMapper.deleteById(commentId);
-
-        // 删除该评论的所有回复
-        LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Comment::getReplyToCommentId, commentId);
-        commentMapper.delete(wrapper);
+        commentMapper.delete(
+            new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getParentId, commentId)
+        );
+        
+        // 记录操作日志
+        operationLogService.log(userId, "DELETE_COMMENT", "DOC", comment.getDocumentId(), 
+            "删除评论");
+        
+        log.info("删除评论: commentId={}, userId={}", commentId, userId);
     }
-
+    
     /**
-     * 实体转 VO
+     * 标记评论已解决
      */
-    private CommentVO convertToVO(Comment comment) {
+    @Transactional(rollbackFor = Exception.class)
+    public void resolveComment(Long commentId, Long userId) {
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+        
+        Document document = documentMapper.selectById(comment.getDocumentId());
+        if (document == null) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+        
+        // 只有文档所有者可以标记评论已解决
+        if (!document.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
+        }
+        
+        comment.setIsResolved(true);
+        comment.setUpdatedAt(LocalDateTime.now());
+        commentMapper.updateById(comment);
+        
+        // 通知评论作者
+        if (!comment.getUserId().equals(userId)) {
+            notificationService.createNotification(
+                comment.getUserId(),
+                "COMMENT_RESOLVED",
+                "你的评论已被标记为已解决",
+                commentId
+            );
+        }
+        
+        // 记录操作日志
+        operationLogService.log(userId, "RESOLVE_COMMENT", "DOC", comment.getDocumentId(), 
+            "标记评论已解决");
+        
+        log.info("标记评论已解决: commentId={}, userId={}", commentId, userId);
+    }
+    
+    /**
+     * 转换为CommentVO
+     */
+    private CommentVO convertToCommentVO(Comment comment) {
         CommentVO vo = new CommentVO();
-        BeanUtils.copyProperties(comment, vo);
-
+        vo.setId(comment.getId());
+        vo.setDocumentId(comment.getDocumentId());
+        vo.setUserId(comment.getUserId());
+        vo.setContent(comment.getContent());
+        vo.setParentId(comment.getParentId());
+        vo.setIsResolved(comment.getIsResolved());
+        vo.setCreatedAt(comment.getCreatedAt());
+        vo.setUpdatedAt(comment.getUpdatedAt());
+        
         // 设置用户信息
         User user = userMapper.selectById(comment.getUserId());
         if (user != null) {
             vo.setUsername(user.getUsername());
-            vo.setUserAvatar(user.getAvatarUrl());
         }
-
-        // 如果是回复，设置被回复的用户名
-        if (comment.getReplyToCommentId() != null) {
-            Comment parentComment = commentMapper.selectById(comment.getReplyToCommentId());
-            if (parentComment != null) {
-                User parentUser = userMapper.selectById(parentComment.getUserId());
-                if (parentUser != null) {
-                    vo.setReplyToUsername(parentUser.getUsername());
-                }
-            }
-        }
-
+        
         return vo;
-    }
-
-    /**
-     * 解析评论内容中的@提及
-     * 支持 @username 格式
-     */
-    private List<String> parseMentions(String content) {
-        List<String> mentions = new ArrayList<>();
-        if (content == null || content.isEmpty()) {
-            return mentions;
-        }
-
-        // 使用正则表达式匹配 @username 格式
-        // 支持中英文用户名、数字、下划线，长度3-20
-        String pattern = "@([a-zA-Z0-9\u4e00-\u9fa5_]{3,20})";
-        java.util.regex.Pattern r = java.util.regex.Pattern.compile(pattern);
-        java.util.regex.Matcher m = r.matcher(content);
-
-        while (m.find()) {
-            String username = m.group(1);
-            if (!mentions.contains(username)) {
-                mentions.add(username);
-            }
-        }
-
-        return mentions;
     }
 }

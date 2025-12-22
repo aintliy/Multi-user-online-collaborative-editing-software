@@ -1,157 +1,196 @@
 package com.example.demo.controller;
 
+import com.example.demo.common.ApiResponse;
+import com.example.demo.dto.*;
+import com.example.demo.service.DocumentCollaboratorService;
+import com.example.demo.service.DocumentService;
+import com.example.demo.service.DocumentVersionService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.example.demo.common.Result;
-import com.example.demo.dto.CreateDocumentRequest;
-import com.example.demo.dto.DocumentVO;
-import com.example.demo.dto.ShareDocumentRequest;
-import com.example.demo.dto.UpdateDocumentRequest;
-import com.example.demo.entity.DocumentVersion;
-import com.example.demo.service.DocumentService;
-
 /**
- * 文档控制器
+ * 文档控制器（重构版）
  */
 @RestController
 @RequestMapping("/api/documents")
+@RequiredArgsConstructor
 public class DocumentController {
-
-    @Autowired
-    private DocumentService documentService;
-
+    
+    private final DocumentService documentService;
+    private final DocumentVersionService versionService;
+    private final DocumentCollaboratorService collaboratorService;
+    
     /**
      * 创建文档
-     * POST /api/documents
      */
     @PostMapping
-    public Result<DocumentVO> createDocument(@Validated @RequestBody CreateDocumentRequest request,
-                                             Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
+    public ApiResponse<DocumentVO> createDocument(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody CreateDocumentRequest request) {
         DocumentVO document = documentService.createDocument(userId, request);
-        return Result.success("文档创建成功", document);
+        return ApiResponse.success(document);
     }
-
-    /**
-     * 获取文档列表（分页，支持搜索）
-     * GET /api/documents?page=1&size=10&keyword=xxx&type=doc&tags=标签1,标签2&ownerId=1&startDate=2025-01-01&endDate=2025-12-31&sortBy=updatedAt&sortOrder=desc
-     */
-    @GetMapping
-    public Result<IPage<DocumentVO>> getDocumentList(@RequestParam(defaultValue = "1") int page,
-                                                      @RequestParam(defaultValue = "10") int size,
-                                                      @RequestParam(required = false) String keyword,
-                                                      @RequestParam(required = false) String type,
-                                                      @RequestParam(required = false) String tags,
-                                                      @RequestParam(required = false) Long ownerId,
-                                                      @RequestParam(required = false) String startDate,
-                                                      @RequestParam(required = false) String endDate,
-                                                      @RequestParam(defaultValue = "updatedAt") String sortBy,
-                                                      @RequestParam(defaultValue = "desc") String sortOrder,
-                                                      Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        IPage<DocumentVO> documentPage = documentService.getDocumentList(
-            userId, page, size, keyword, type, tags, ownerId, startDate, endDate, sortBy, sortOrder);
-        return Result.success(documentPage);
-    }
-
+    
     /**
      * 获取文档详情
-     * GET /api/documents/{id}
      */
     @GetMapping("/{id}")
-    public Result<DocumentVO> getDocumentById(@PathVariable Long id,
-                                              Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        DocumentVO document = documentService.getDocumentById(userId, id);
-        return Result.success(document);
+    public ApiResponse<DocumentVO> getDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId) {
+        DocumentVO document = documentService.getDocumentById(id, userId);
+        return ApiResponse.success(document);
     }
-
+    
     /**
-     * 更新文档
-     * PUT /api/documents/{id}
+     * 更新文档元信息
      */
     @PutMapping("/{id}")
-    public Result<DocumentVO> updateDocument(@PathVariable Long id,
-                                             @Validated @RequestBody UpdateDocumentRequest request,
-                                             Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        DocumentVO document = documentService.updateDocument(userId, id, request);
-        return Result.success("文档更新成功", document);
+    public ApiResponse<Void> updateDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody UpdateDocumentRequest request) {
+        documentService.updateDocument(id, userId, request);
+        return ApiResponse.success();
     }
-
+    
     /**
      * 删除文档
-     * DELETE /api/documents/{id}
      */
     @DeleteMapping("/{id}")
-    public Result<Void> deleteDocument(@PathVariable Long id,
-                                       Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        documentService.deleteDocument(userId, id);
-        return Result.success("文档删除成功", null);
+    public ApiResponse<Void> deleteDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId) {
+        documentService.deleteDocument(id, userId);
+        return ApiResponse.success();
     }
-
+    
     /**
-     * 分享文档
-     * POST /api/documents/share
+     * 获取文档列表
      */
-    @PostMapping("/share")
-    public Result<Void> shareDocument(@Validated @RequestBody ShareDocumentRequest request,
-                                      Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        documentService.shareDocument(userId, request);
-        return Result.success("文档分享成功", null);
+    @GetMapping
+    public ApiResponse<PageResponse<DocumentVO>> getDocuments(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) Long ownerId) {
+        PageResponse<DocumentVO> documents = documentService.getDocuments(
+                userId, page, pageSize, keyword, tag, ownerId);
+        return ApiResponse.success(documents);
     }
-
+    
     /**
-     * 获取文档版本列表
-     * GET /api/documents/{id}/versions
+     * 克隆文档
+     */
+    @PostMapping("/{id}/clone")
+    public ApiResponse<DocumentVO> cloneDocument(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId) {
+        DocumentVO document = documentService.cloneDocument(id, userId);
+        return ApiResponse.success(document);
+    }
+    
+    // ============ 版本控制 ============
+    
+    /**
+     * 提交版本
+     */
+    @PostMapping("/{id}/commit")
+    public ApiResponse<DocumentVersionVO> commitVersion(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody CommitDocumentRequest request) {
+        DocumentVersionVO version = versionService.commitVersion(id, userId, request);
+        return ApiResponse.success(version);
+    }
+    
+    /**
+     * 获取版本历史
      */
     @GetMapping("/{id}/versions")
-    public Result<List<DocumentVersion>> getVersions(@PathVariable Long id,
-                                                      Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        List<DocumentVersion> versions = documentService.getVersions(userId, id);
-        return Result.success(versions);
+    public ApiResponse<List<DocumentVersionVO>> getVersionHistory(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId) {
+        List<DocumentVersionVO> versions = versionService.getVersionHistory(id, userId);
+        return ApiResponse.success(versions);
     }
-
+    
     /**
-     * 获取文档版本详情
-     * GET /api/documents/{id}/versions/{versionId}
+     * 获取特定版本
      */
-    @GetMapping("/{id}/versions/{versionId}")
-    public Result<DocumentVersion> getVersionDetail(@PathVariable Long id,
-                                                     @PathVariable Long versionId,
-                                                     Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        DocumentVersion version = documentService.getVersionDetail(userId, id, versionId);
-        return Result.success(version);
+    @GetMapping("/versions/{versionId}")
+    public ApiResponse<DocumentVersionVO> getVersion(
+            @PathVariable Long versionId,
+            @AuthenticationPrincipal Long userId) {
+        DocumentVersionVO version = versionService.getVersion(versionId, userId);
+        return ApiResponse.success(version);
     }
-
+    
     /**
      * 回滚到指定版本
-     * POST /api/documents/{id}/versions/{versionId}/rollback
      */
-    @PostMapping("/{id}/versions/{versionId}/rollback")
-    public Result<DocumentVO> rollbackVersion(@PathVariable Long id,
-                                               @PathVariable Long versionId,
-                                               Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        DocumentVO document = documentService.rollbackVersion(userId, id, versionId);
-        return Result.success("版本回滚成功", document);
+    @PostMapping("/{id}/rollback")
+    public ApiResponse<DocumentVersionVO> rollbackToVersion(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam Integer versionNumber) {
+        DocumentVersionVO version = versionService.rollbackToVersion(id, versionNumber, userId);
+        return ApiResponse.success(version);
+    }
+    
+    // ============ 协作管理 ============
+    
+    /**
+     * 添加协作者
+     */
+    @PostMapping("/{id}/collaborators")
+    public ApiResponse<Void> addCollaborator(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody AddCollaboratorRequest request) {
+        collaboratorService.addCollaborator(id, userId, request);
+        return ApiResponse.success();
+    }
+    
+    /**
+     * 获取协作者列表
+     */
+    @GetMapping("/{id}/collaborators")
+    public ApiResponse<List<CollaboratorVO>> getCollaborators(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Long userId) {
+        List<CollaboratorVO> collaborators = collaboratorService.getCollaborators(id, userId);
+        return ApiResponse.success(collaborators);
+    }
+    
+    /**
+     * 移除协作者
+     */
+    @DeleteMapping("/{id}/collaborators/{collaboratorId}")
+    public ApiResponse<Void> removeCollaborator(
+            @PathVariable Long id,
+            @PathVariable Long collaboratorId,
+            @AuthenticationPrincipal Long userId) {
+        collaboratorService.removeCollaborator(id, userId, collaboratorId);
+        return ApiResponse.success();
+    }
+    
+    /**
+     * 更新协作者权限
+     */
+    @PutMapping("/{id}/collaborators/{collaboratorId}")
+    public ApiResponse<Void> updateCollaboratorRole(
+            @PathVariable Long id,
+            @PathVariable Long collaboratorId,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String role) {
+        collaboratorService.updateCollaboratorRole(id, userId, collaboratorId, role);
+        return ApiResponse.success();
     }
 }

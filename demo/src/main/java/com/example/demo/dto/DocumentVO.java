@@ -1,36 +1,48 @@
 package com.example.demo.dto;
 
-import java.time.LocalDateTime;
-
 import lombok.Data;
+import java.time.LocalDateTime;
 
 /**
  * 文档视图对象
  */
 @Data
 public class DocumentVO {
-
+    
     private Long id;
-
+    
     private String title;
-
+    
     private Long ownerId;
-
-    private String ownerName;  // 所有者用户名
-
+    
+    private String ownerName;
+    
     private String content;
-
+    
     private String docType;
-
+    
+    private String visibility;
+    
     private String tags;
-
-    private String folderId;
-
+    
     private String status;
-
-    private String permission;  // 当前用户对该文档的权限：OWNER / EDITOR / VIEWER
-
+    
+    /**
+     * 克隆来源文档ID
+     */
+    private Long forkedFromId;
+    
     private LocalDateTime createdAt;
-
+    
     private LocalDateTime updatedAt;
+    
+    /**
+     * 当前用户是否为所有者
+     */
+    private Boolean isOwner;
+    
+    /**
+     * 当前用户是否具有编辑权限
+     */
+    private Boolean canEdit;
 }

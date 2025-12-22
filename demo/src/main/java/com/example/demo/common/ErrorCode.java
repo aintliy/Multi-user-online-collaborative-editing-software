@@ -27,13 +27,38 @@ public enum ErrorCode {
     DOCUMENT_NOT_FOUND(3001, "文档不存在"),
     DOCUMENT_NO_PERMISSION(3002, "无权访问该文档"),
     DOCUMENT_VERSION_NOT_FOUND(3003, "文档版本不存在"),
+    VERSION_NOT_FOUND(3004, "版本不存在"),
+    COLLABORATOR_NOT_FOUND(3005, "协作者不存在"),
+    COLLABORATOR_ALREADY_EXISTS(3006, "协作者已存在"),
+    CANNOT_ADD_SELF(3007, "不能添加自己为协作者"),
     
     // 评论和通知相关 3500-3599
     COMMENT_NOT_FOUND(3501, "评论不存在"),
-    NOTIFICATION_NOT_FOUND(3502, "通知不存在"),
+    COMMENT_NO_PERMISSION(3502, "无权操作该评论"),
+    NOTIFICATION_NOT_FOUND(3510, "通知不存在"),
+    NOTIFICATION_NO_PERMISSION(3511, "无权操作该通知"),
     
     // 任务相关 3600-3699
     TASK_NOT_FOUND(3601, "任务不存在"),
+    TASK_NO_PERMISSION(3602, "无权操作该任务"),
+    
+    // 好友相关 3650-3669
+    CANNOT_ADD_SELF_AS_FRIEND(3650, "不能添加自己为好友"),
+    ALREADY_FRIENDS(3651, "已经是好友"),
+    FRIEND_REQUEST_ALREADY_SENT(3652, "好友请求已发送"),
+    FRIEND_REQUEST_NOT_FOUND(3653, "好友请求不存在"),
+    FRIEND_REQUEST_NO_PERMISSION(3654, "无权操作该好友请求"),
+    FRIEND_REQUEST_ALREADY_PROCESSED(3655, "好友请求已处理"),
+    
+    // 管理员相关 3670-3689
+    CANNOT_UPDATE_SELF_ROLE(3670, "不能修改自己的角色"),
+    CANNOT_UPDATE_SELF_STATUS(3671, "不能修改自己的状态"),
+    CANNOT_DELETE_SELF(3672, "不能删除自己"),
+    
+    // 文件相关 3690-3699
+    FILE_EMPTY(3690, "文件为空"),
+    FILE_NAME_INVALID(3691, "文件名无效"),
+    FILE_TYPE_INVALID(3692, "文件类型不支持"),
     
     // 角色权限相关 3700-3799
     ROLE_NOT_FOUND(3701, "角色不存在"),

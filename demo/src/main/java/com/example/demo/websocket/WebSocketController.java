@@ -56,7 +56,7 @@ public class WebSocketController {
         
         try {
             // 检查用户是否有权限访问文档
-            documentService.getDocumentById(userId, docId);
+            documentService.getDocumentById(docId, userId);
 
             // 用户加入文档
             List<OnlineUser> onlineUsers = onlineUserManager.joinDocument(docId, userId);

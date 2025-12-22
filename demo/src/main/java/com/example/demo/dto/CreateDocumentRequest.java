@@ -1,20 +1,29 @@
 package com.example.demo.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
+import javax.validation.constraints.NotBlank;
 
 /**
- * 创建文档请求 DTO
+ * 创建文档请求DTO
  */
 @Data
 public class CreateDocumentRequest {
-
+    
     @NotBlank(message = "文档标题不能为空")
-    @Size(max = 255, message = "标题长度不能超过 255 字符")
     private String title;
-
-    private String content;
-
-    private String docType;  // doc / sheet / slide，默认 doc
+    
+    /**
+     * 文档类型：doc / sheet / slide / markdown
+     */
+    private String type;
+    
+    /**
+     * 可见性：private / public
+     */
+    private String visibility;
+    
+    /**
+     * 模板ID（可选）
+     */
+    private Long templateId;
 }

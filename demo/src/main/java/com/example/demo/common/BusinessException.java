@@ -35,4 +35,18 @@ public class BusinessException extends RuntimeException {
     public String getMessage() {
         return message;
     }
+    
+    /**
+     * 获取ErrorCode对象（用于向后兼容）
+     */
+    public ErrorCode getErrorCode() {
+        // 根据code查找对应的ErrorCode
+        for (ErrorCode ec : ErrorCode.values()) {
+            if (ec.getCode().equals(this.code)) {
+                return ec;
+            }
+        }
+        // 如果找不到，返回通用错误
+        return ErrorCode.PARAM_ERROR;
+    }
 }

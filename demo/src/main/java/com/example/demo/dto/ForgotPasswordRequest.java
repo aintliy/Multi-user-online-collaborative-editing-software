@@ -1,11 +1,11 @@
 package com.example.demo.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import javax.validation.constraints.Email;
+import javax.validation.constraints.NotBlank;
 
 /**
- * 忘记密码请求
+ * 忘记密码请求DTO
  */
 @Data
 public class ForgotPasswordRequest {
