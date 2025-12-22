@@ -14,6 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     /**
      * 配置 CORS 跨域
      */
+    @SuppressWarnings("null")
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
@@ -27,6 +28,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     /**
      * 配置静态资源访问
      */
+    @SuppressWarnings("null")
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // 配置头像上传目录的访问路径

@@ -26,6 +26,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @SuppressWarnings("null")
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // 启用简单的消息代理，用于向客户端发送消息
@@ -34,6 +35,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setApplicationDestinationPrefixes("/app");
     }
 
+    @SuppressWarnings("null")
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 注册 STOMP 端点，允许跨域
@@ -42,6 +44,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .withSockJS();
     }
 
+    @SuppressWarnings("null")
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         // 添加拦截器，用于 JWT 认证

@@ -1,20 +1,5 @@
 package com.example.demo.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.demo.common.BusinessException;
-import com.example.demo.common.ErrorCode;
-import com.example.demo.dto.UserVO;
-import com.example.demo.entity.User;
-import com.example.demo.entity.UserFriend;
-import com.example.demo.mapper.UserFriendMapper;
-import com.example.demo.mapper.UserMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +9,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.demo.common.BusinessException;
+import com.example.demo.common.ErrorCode;
+import com.example.demo.dto.UserVO;
+import com.example.demo.entity.User;
+import com.example.demo.entity.UserFriend;
+import com.example.demo.mapper.UserFriendMapper;
+import com.example.demo.mapper.UserMapper;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 用户服务
