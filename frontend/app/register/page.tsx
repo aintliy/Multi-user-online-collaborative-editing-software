@@ -1,16 +1,53 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, message } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
-import { register, RegisterRequest } from '@/lib/api/auth';
+import { Form, Input, Button, message, Row, Col } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { register, sendVerificationCode, RegisterRequest } from '@/lib/api/auth';
 import Link from 'next/link';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [form] = Form.useForm();
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  const handleSendCode = async () => {
+    try {
+      const email = form.getFieldValue('email');
+      if (!email) {
+        message.error('请先输入邮箱');
+        return;
+      }
+      // 简单的邮箱格式校验
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        message.error('请输入有效的邮箱地址');
+        return;
+      }
+
+      setSendingCode(true);
+      await sendVerificationCode(email);
+      message.success('验证码已发送，请查收邮件');
+      setCountdown(60); // 60秒倒计时
+    } catch (error: any) {
+      message.error(error.message || '发送验证码失败');
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   const onFinish = async (values: RegisterRequest) => {
     setLoading(true);
@@ -64,6 +101,30 @@ export default function RegisterPage() {
               prefix={<MailOutlined />}
               placeholder="邮箱"
             />
+          </Form.Item>
+
+          <Form.Item
+            name="verificationCode"
+            rules={[{ required: true, message: '请输入验证码' }]}
+          >
+            <Row gutter={8}>
+              <Col span={16}>
+                <Input
+                  prefix={<SafetyCertificateOutlined />}
+                  placeholder="验证码"
+                />
+              </Col>
+              <Col span={8}>
+                <Button
+                  onClick={handleSendCode}
+                  disabled={countdown > 0 || sendingCode}
+                  loading={sendingCode}
+                  block
+                >
+                  {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                </Button>
+              </Col>
+            </Row>
           </Form.Item>
 
           <Form.Item

@@ -4,6 +4,7 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
+  verificationCode: string;
   phone?: string;
 }
 
@@ -33,6 +34,11 @@ export interface UserVO {
 // 用户注册
 export const register = (data: RegisterRequest): Promise<UserVO> => {
   return api.post('/api/auth/register', data);
+};
+
+// 发送注册验证码
+export const sendVerificationCode = (email: string): Promise<void> => {
+  return api.post('/api/auth/send-verification-code', { email });
 };
 
 // 用户登录
