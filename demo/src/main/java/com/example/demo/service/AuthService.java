@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -44,6 +45,8 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final StringRedisTemplate redisTemplate;
     private final JavaMailSender mailSender;
+    @Value("${spring.mail.username}")
+    private String mailFrom;
     
     /**
      * 发送注册验证码
@@ -69,6 +72,7 @@ public class AuthService {
         // 发送邮件
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailFrom);
             message.setTo(email);
             message.setSubject("【协作编辑系统】注册验证码");
             message.setText("您的注册验证码是：" + code + "\n\n验证码有效期5分钟，请尽快完成注册。");
@@ -195,6 +199,7 @@ public class AuthService {
         // 发送邮件
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailFrom);
             message.setTo(email);
             message.setSubject("【协作编辑系统】密码重置");
             message.setText("您好，\n\n您申请了密码重置。请点击以下链接重置密码（1小时内有效）：\n\n" +
