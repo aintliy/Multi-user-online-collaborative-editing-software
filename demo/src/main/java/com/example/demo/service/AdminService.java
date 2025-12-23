@@ -1,5 +1,13 @@
 package com.example.demo.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -9,15 +17,9 @@ import com.example.demo.dto.PageResponse;
 import com.example.demo.dto.UserVO;
 import com.example.demo.entity.User;
 import com.example.demo.mapper.UserMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 管理员服务
@@ -211,6 +213,7 @@ public class AdminService {
         vo.setRole(user.getRole());
         vo.setStatus(user.getStatus());
         vo.setCreatedAt(user.getCreatedAt());
+        vo.setUpdatedAt(user.getUpdatedAt());
         return vo;
     }
     

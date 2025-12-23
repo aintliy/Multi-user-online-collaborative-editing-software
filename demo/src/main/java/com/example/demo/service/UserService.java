@@ -208,6 +208,7 @@ public class UserService {
         vo.setRole(user.getRole());
         vo.setStatus(user.getStatus());
         vo.setCreatedAt(user.getCreatedAt());
+        vo.setUpdatedAt(user.getUpdatedAt());
         return vo;
     }
     

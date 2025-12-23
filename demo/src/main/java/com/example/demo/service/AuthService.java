@@ -294,6 +294,8 @@ public class AuthService {
         vo.setProfile(user.getProfile());
         vo.setRole(user.getRole());
         vo.setStatus(user.getStatus());
+        vo.setCreatedAt(user.getCreatedAt());
+        vo.setUpdatedAt(user.getUpdatedAt());
         return vo;
     }
 }
