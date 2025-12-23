@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -108,7 +108,7 @@ public class AdminService {
         }
 
         user.setRole(normalizedRole);
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         // 记录操作日志
@@ -150,7 +150,7 @@ public class AdminService {
 
         String oldStatus = user.getStatus();
         user.setStatus(normalizedStatus);
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         // 记录操作日志
@@ -183,7 +183,7 @@ public class AdminService {
 
         // 软删除
         user.setStatus("deleted");
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         // 记录操作日志
@@ -204,7 +204,7 @@ public class AdminService {
         }
         
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         // 记录操作日志

@@ -1,12 +1,14 @@
 package com.example.demo.service;
 
-import com.example.demo.entity.OperationLog;
-import com.example.demo.mapper.OperationLogMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.OffsetDateTime;
+
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import com.example.demo.entity.OperationLog;
+import com.example.demo.mapper.OperationLogMapper;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 操作日志服务
@@ -29,7 +31,7 @@ public class OperationLogService {
             operationLog.setTargetType(targetType);
             operationLog.setTargetId(targetId);
             operationLog.setDetail(detail);
-            operationLog.setCreatedAt(LocalDateTime.now());
+            operationLog.setCreatedAt(OffsetDateTime.now());
             
             operationLogMapper.insert(operationLog);
         } catch (Exception e) {

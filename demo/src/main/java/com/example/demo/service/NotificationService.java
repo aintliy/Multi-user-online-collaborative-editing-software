@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,7 +37,7 @@ public class NotificationService {
         notification.setContent(content);
         notification.setReferenceId(relatedId);
         notification.setIsRead(false);
-        notification.setCreatedAt(LocalDateTime.now());
+        notification.setCreatedAt(OffsetDateTime.now());
         
         notificationMapper.insert(notification);
         

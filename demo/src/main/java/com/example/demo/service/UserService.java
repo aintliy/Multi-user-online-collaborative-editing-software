@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -139,7 +139,7 @@ public class UserService {
         // 更新用户头像URL
         String avatarUrl = "/uploads/avatars/" + filename;
         user.setAvatarUrl(avatarUrl);
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         // 记录操作日志

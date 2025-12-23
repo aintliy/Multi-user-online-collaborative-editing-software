@@ -1,6 +1,6 @@
 package com.example.demo.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import lombok.Data;
@@ -18,7 +18,7 @@ public class CommentVO {
     private Long replyToCommentId;
     private String rangeInfo;
     private String status; // open / resolved
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
     private List<CommentVO> replies;
 }

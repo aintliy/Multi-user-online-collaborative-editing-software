@@ -1,6 +1,6 @@
 package com.example.demo.entity;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -51,13 +51,13 @@ public class DocumentWorkspaceRequest {
      * 创建时间
      */
     @TableField("created_at")
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     
     /**
      * 处理时间
      */
     @TableField("handled_at")
-    private LocalDateTime handledAt;
+    private OffsetDateTime handledAt;
     
     /**
      * 处理人ID（通常为文档所有者）

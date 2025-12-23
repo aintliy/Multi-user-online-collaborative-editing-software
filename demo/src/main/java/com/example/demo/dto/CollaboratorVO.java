@@ -1,6 +1,6 @@
 package com.example.demo.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import lombok.Data;
 
@@ -16,5 +16,5 @@ public class CollaboratorVO {
     private String email;
     private String avatarUrl;
     private String role; // EDITOR / VIEWER
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -71,8 +71,8 @@ public class CommentService {
         comment.setContent(request.getContent());
         comment.setReplyToCommentId(request.getReplyToCommentId());
         comment.setStatus("open");
-        comment.setCreatedAt(LocalDateTime.now());
-        comment.setUpdatedAt(LocalDateTime.now());
+        comment.setCreatedAt(OffsetDateTime.now());
+        comment.setUpdatedAt(OffsetDateTime.now());
         
         commentMapper.insert(comment);
         
@@ -212,7 +212,7 @@ public class CommentService {
         }
         
         comment.setStatus("resolved");
-        comment.setUpdatedAt(LocalDateTime.now());
+        comment.setUpdatedAt(OffsetDateTime.now());
         commentMapper.updateById(comment);
         
         // 通知评论作者

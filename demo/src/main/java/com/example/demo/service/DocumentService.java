@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,8 +52,8 @@ public class DocumentService {
         document.setVisibility(request.getVisibility() != null ? request.getVisibility() : "private");
         document.setContent("");
         document.setStatus("active");
-        document.setCreatedAt(LocalDateTime.now());
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setCreatedAt(OffsetDateTime.now());
+        document.setUpdatedAt(OffsetDateTime.now());
         
         documentMapper.insert(document);
         
@@ -108,7 +108,7 @@ public class DocumentService {
             document.setTags(request.getTags());
         }
         
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setUpdatedAt(OffsetDateTime.now());
         documentMapper.updateById(document);
         
         // 记录操作日志
@@ -139,7 +139,7 @@ public class DocumentService {
         
         // 软删除
         document.setStatus("deleted");
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setUpdatedAt(OffsetDateTime.now());
         documentMapper.updateById(document);
         
         // 记录操作日志
@@ -221,8 +221,8 @@ public class DocumentService {
         clonedDoc.setVisibility("private"); // 克隆后默认私有
         clonedDoc.setForkedFromId(documentId);
         clonedDoc.setStatus("active");
-        clonedDoc.setCreatedAt(LocalDateTime.now());
-        clonedDoc.setUpdatedAt(LocalDateTime.now());
+        clonedDoc.setCreatedAt(OffsetDateTime.now());
+        clonedDoc.setUpdatedAt(OffsetDateTime.now());
         
         documentMapper.insert(clonedDoc);
         

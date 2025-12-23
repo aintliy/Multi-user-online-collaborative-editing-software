@@ -1,6 +1,6 @@
 package com.example.demo.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import lombok.Data;
 /**
@@ -14,5 +14,5 @@ public class NotificationVO {
     private Long referenceId;
     private String content;
     private Boolean isRead;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

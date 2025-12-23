@@ -1,6 +1,6 @@
 package com.example.demo.entity;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -81,11 +81,11 @@ public class Document {
      * 创建时间
      */
     @TableField("created_at")
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     
     /**
      * 更新时间
      */
     @TableField("updated_at")
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

@@ -1,7 +1,8 @@
 package com.example.demo.dto;
 
+import java.time.OffsetDateTime;
+
 import lombok.Data;
-import java.time.LocalDateTime;
 
 /**
  * 文档视图对象
@@ -32,9 +33,9 @@ public class DocumentVO {
      */
     private Long forkedFromId;
     
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
     
     /**
      * 当前用户是否为所有者

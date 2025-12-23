@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -59,8 +59,8 @@ public class TaskService {
         task.setStatus("TODO");
         task.setDueDate(request.getDueDate());
         task.setRelatedDocId(request.getRelatedDocId());
-        task.setCreatedAt(LocalDateTime.now());
-        task.setUpdatedAt(LocalDateTime.now());
+        task.setCreatedAt(OffsetDateTime.now());
+        task.setUpdatedAt(OffsetDateTime.now());
         
         taskMapper.insert(task);
         
@@ -134,7 +134,7 @@ public class TaskService {
             );
         }
         
-        task.setUpdatedAt(LocalDateTime.now());
+        task.setUpdatedAt(OffsetDateTime.now());
         taskMapper.updateById(task);
         
         // 如果状态改变，通知相关人员

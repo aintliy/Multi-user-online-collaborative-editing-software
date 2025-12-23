@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -114,8 +114,8 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole("USER"); // 注册接口只创建普通用户
         user.setStatus("active");
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setCreatedAt(OffsetDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         
         userMapper.insert(user);
         
@@ -238,7 +238,7 @@ public class AuthService {
         }
         
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         // 删除令牌
@@ -279,7 +279,7 @@ public class AuthService {
             user.setProfile(request.getProfile());
         }
         
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setUpdatedAt(OffsetDateTime.now());
         userMapper.updateById(user);
         
         log.info("用户资料更新: {}", userId);

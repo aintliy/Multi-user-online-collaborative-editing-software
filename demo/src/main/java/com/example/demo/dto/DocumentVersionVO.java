@@ -1,6 +1,6 @@
 package com.example.demo.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import lombok.Data;
 
@@ -24,5 +24,5 @@ public class DocumentVersionVO {
     
     private String creatorName;
     
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

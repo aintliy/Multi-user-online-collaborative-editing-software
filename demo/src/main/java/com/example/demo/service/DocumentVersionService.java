@@ -1,5 +1,12 @@
 package com.example.demo.service;
 
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.common.BusinessException;
 import com.example.demo.common.ErrorCode;
@@ -9,14 +16,9 @@ import com.example.demo.entity.Document;
 import com.example.demo.entity.DocumentVersion;
 import com.example.demo.mapper.DocumentMapper;
 import com.example.demo.mapper.DocumentVersionMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 文档版本服务（Git风格版本控制）
@@ -63,13 +65,13 @@ public class DocumentVersionService {
         version.setContent(request.getContent());
         version.setCommitMessage(request.getCommitMessage());
         version.setCreatedBy(userId);
-        version.setCreatedAt(LocalDateTime.now());
+        version.setCreatedAt(OffsetDateTime.now());
         
         versionMapper.insert(version);
         
         // 更新文档的当前内容
         document.setContent(request.getContent());
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setUpdatedAt(OffsetDateTime.now());
         documentMapper.updateById(document);
         
         // 记录操作日志
@@ -172,13 +174,13 @@ public class DocumentVersionService {
         newVersion.setContent(targetVersion.getContent());
         newVersion.setCommitMessage("回滚到版本 " + versionNumber);
         newVersion.setCreatedBy(userId);
-        newVersion.setCreatedAt(LocalDateTime.now());
+        newVersion.setCreatedAt(OffsetDateTime.now());
         
         versionMapper.insert(newVersion);
         
         // 更新文档内容
         document.setContent(targetVersion.getContent());
-        document.setUpdatedAt(LocalDateTime.now());
+        document.setUpdatedAt(OffsetDateTime.now());
         documentMapper.updateById(document);
         
         // 记录操作日志

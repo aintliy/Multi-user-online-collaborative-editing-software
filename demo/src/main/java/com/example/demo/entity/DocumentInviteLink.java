@@ -1,6 +1,6 @@
 package com.example.demo.entity;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -57,7 +57,7 @@ public class DocumentInviteLink {
      * 过期时间
      */
     @TableField("expires_at")
-    private LocalDateTime expiresAt;
+    private OffsetDateTime expiresAt;
     
     /**
      * 创建人ID
@@ -69,5 +69,5 @@ public class DocumentInviteLink {
      * 创建时间
      */
     @TableField("created_at")
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

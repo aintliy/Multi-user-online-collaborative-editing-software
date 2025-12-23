@@ -1,6 +1,6 @@
 package com.example.demo.service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -69,7 +69,7 @@ public class FriendService {
         friendRequest.setUserId(userId);
         friendRequest.setFriendId(friendId);
         friendRequest.setStatus("pending");
-        friendRequest.setCreatedAt(LocalDateTime.now());
+        friendRequest.setCreatedAt(OffsetDateTime.now());
         
         friendMapper.insert(friendRequest);
         
@@ -110,7 +110,7 @@ public class FriendService {
         
         // 更新请求状态
         friendRequest.setStatus("accepted");
-        friendRequest.setUpdatedAt(LocalDateTime.now());
+        friendRequest.setUpdatedAt(OffsetDateTime.now());
         friendMapper.updateById(friendRequest);
         
         // 创建反向好友关系
@@ -118,8 +118,8 @@ public class FriendService {
         reverseFriend.setUserId(friendRequest.getFriendId());
         reverseFriend.setFriendId(friendRequest.getUserId());
         reverseFriend.setStatus("accepted");
-        reverseFriend.setCreatedAt(LocalDateTime.now());
-        reverseFriend.setUpdatedAt(LocalDateTime.now());
+        reverseFriend.setCreatedAt(OffsetDateTime.now());
+        reverseFriend.setUpdatedAt(OffsetDateTime.now());
         friendMapper.insert(reverseFriend);
         
         // 发送通知
@@ -159,7 +159,7 @@ public class FriendService {
         
         // 更新请求状态
         friendRequest.setStatus("rejected");
-        friendRequest.setUpdatedAt(LocalDateTime.now());
+        friendRequest.setUpdatedAt(OffsetDateTime.now());
         friendMapper.updateById(friendRequest);
         
         // 记录操作日志

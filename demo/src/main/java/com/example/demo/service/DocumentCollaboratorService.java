@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -78,7 +78,7 @@ public class DocumentCollaboratorService {
         collaborator.setUserId(request.getUserId());
         collaborator.setRole(request.getRole() != null ? request.getRole() : "VIEWER");
         collaborator.setInvitedBy(userId);
-        collaborator.setCreatedAt(LocalDateTime.now());
+        collaborator.setCreatedAt(OffsetDateTime.now());
         
         collaboratorMapper.insert(collaborator);
         
@@ -125,7 +125,7 @@ public class DocumentCollaboratorService {
         }
         
         // 软删除
-        collaborator.setRemovedAt(LocalDateTime.now());
+        collaborator.setRemovedAt(OffsetDateTime.now());
         collaboratorMapper.updateById(collaborator);
         
         // 发送通知
