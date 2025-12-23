@@ -1,6 +1,6 @@
 package com.example.demo.controller;
 
-import com.example.demo.common.ApiResponse;
+import com.example.demo.common.Result;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.dto.UserVO;
 import com.example.demo.service.AdminService;
@@ -24,69 +24,69 @@ public class AdminController {
      * 获取用户列表
      */
     @GetMapping("/users")
-    public ApiResponse<PageResponse<UserVO>> getUsers(
+    public Result<PageResponse<UserVO>> getUsers(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String status) {
         PageResponse<UserVO> users = adminService.getUsers(page, pageSize, keyword, role, status);
-        return ApiResponse.success(users);
+        return Result.success(users);
     }
     
     /**
      * 更新用户角色
      */
     @PutMapping("/users/{userId}/role")
-    public ApiResponse<Void> updateUserRole(
+    public Result<Void> updateUserRole(
             @AuthenticationPrincipal Long adminId,
             @PathVariable Long userId,
             @RequestParam String role) {
         adminService.updateUserRole(adminId, userId, role);
-        return ApiResponse.success();
+        return Result.success();
     }
     
     /**
      * 更新用户状态
      */
     @PutMapping("/users/{userId}/status")
-    public ApiResponse<Void> updateUserStatus(
+    public Result<Void> updateUserStatus(
             @AuthenticationPrincipal Long adminId,
             @PathVariable Long userId,
             @RequestParam String status) {
         adminService.updateUserStatus(adminId, userId, status);
-        return ApiResponse.success();
+        return Result.success();
     }
     
     /**
      * 删除用户
      */
     @DeleteMapping("/users/{userId}")
-    public ApiResponse<Void> deleteUser(
+    public Result<Void> deleteUser(
             @AuthenticationPrincipal Long adminId,
             @PathVariable Long userId) {
         adminService.deleteUser(adminId, userId);
-        return ApiResponse.success();
+        return Result.success();
     }
     
     /**
      * 重置用户密码
      */
     @PostMapping("/users/{userId}/reset-password")
-    public ApiResponse<Void> resetUserPassword(
+    public Result<Void> resetUserPassword(
             @AuthenticationPrincipal Long adminId,
             @PathVariable Long userId,
             @RequestParam String newPassword) {
         adminService.resetUserPassword(adminId, userId, newPassword);
-        return ApiResponse.success();
+        return Result.success();
     }
     
     /**
      * 获取系统统计
      */
     @GetMapping("/stats")
-    public ApiResponse<AdminService.SystemStatsVO> getSystemStats() {
+    public Result<AdminService.SystemStatsVO> getSystemStats() {
         AdminService.SystemStatsVO stats = adminService.getSystemStats();
-        return ApiResponse.success(stats);
+        return Result.success(stats);
     }
 }

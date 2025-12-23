@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.common.ApiResponse;
+import com.example.demo.common.Result;
 import com.example.demo.dto.CreateTaskRequest;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.dto.TaskVO;
@@ -35,52 +35,52 @@ public class TaskController {
      * 创建任务
      */
     @PostMapping
-    public ApiResponse<TaskVO> createTask(
+    public Result<TaskVO> createTask(
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody CreateTaskRequest request) {
         TaskVO task = taskService.createTask(userId, request);
-        return ApiResponse.success(task);
+        return Result.success(task);
     }
     
     /**
      * 获取任务详情
      */
     @GetMapping("/{id}")
-    public ApiResponse<TaskVO> getTask(
+    public Result<TaskVO> getTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Long userId) {
         TaskVO task = taskService.getTaskById(id, userId);
-        return ApiResponse.success(task);
+        return Result.success(task);
     }
     
     /**
      * 更新任务
      */
     @PutMapping("/{id}")
-    public ApiResponse<TaskVO> updateTask(
+    public Result<TaskVO> updateTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody UpdateTaskRequest request) {
         TaskVO task = taskService.updateTask(id, userId, request);
-        return ApiResponse.success(task);
+        return Result.success(task);
     }
     
     /**
      * 删除任务
      */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteTask(
+    public Result<Void> deleteTask(
             @PathVariable Long id,
             @AuthenticationPrincipal Long userId) {
         taskService.deleteTask(id, userId);
-        return ApiResponse.success();
+        return Result.success();
     }
     
     /**
      * 获取任务列表
      */
     @GetMapping
-    public ApiResponse<PageResponse<TaskVO>> getTasks(
+    public Result<PageResponse<TaskVO>> getTasks(
             @AuthenticationPrincipal Long userId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize,
@@ -91,6 +91,6 @@ public class TaskController {
             @RequestParam(required = false) Long relatedDocId) {
         PageResponse<TaskVO> tasks = taskService.getTasks(
                 userId, page, pageSize, status, priority, assigneeId, creatorId, relatedDocId);
-        return ApiResponse.success(tasks);
+        return Result.success(tasks);
     }
 }

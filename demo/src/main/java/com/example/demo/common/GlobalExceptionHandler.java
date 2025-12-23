@@ -24,16 +24,16 @@ public class GlobalExceptionHandler {
      * 处理业务异常
      */
     @ExceptionHandler(BusinessException.class)
-    public ApiResponse<Void> handleBusinessException(BusinessException e) {
+    public Result<Void> handleBusinessException(BusinessException e) {
         logger.warn("业务异常: code={}, message={}", e.getErrorCode().getCode(), e.getMessage());
-        return ApiResponse.error(e.getErrorCode());
+        return Result.error(e.getErrorCode());
     }
 
     /**
      * 处理参数校验异常
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ApiResponse<Void> handleValidationException(MethodArgumentNotValidException e) {
+    public Result<Void> handleValidationException(MethodArgumentNotValidException e) {
         Map<String, String> errors = new HashMap<>();
         e.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -46,24 +46,24 @@ public class GlobalExceptionHandler {
                 ? fieldError.getDefaultMessage()
                 : "参数校验失败";
         logger.warn("参数校验异常: {}", errors);
-        return ApiResponse.error(ErrorCode.PARAM_ERROR, message);
+        return Result.error(ErrorCode.PARAM_ERROR, message);
     }
     
     /**
      * 处理权限不足异常
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ApiResponse<Void> handleAccessDeniedException(AccessDeniedException e) {
+    public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
         logger.warn("权限不足: {}", e.getMessage());
-        return ApiResponse.error(ErrorCode.FORBIDDEN);
+        return Result.error(ErrorCode.FORBIDDEN);
     }
 
     /**
      * 处理其他未预期异常
      */
     @ExceptionHandler(Exception.class)
-    public ApiResponse<Void> handleException(Exception e) {
+    public Result<Void> handleException(Exception e) {
         logger.error("系统异常", e);
-        return ApiResponse.error(ErrorCode.SYSTEM_ERROR);
+        return Result.error(ErrorCode.SYSTEM_ERROR);
     }
 }

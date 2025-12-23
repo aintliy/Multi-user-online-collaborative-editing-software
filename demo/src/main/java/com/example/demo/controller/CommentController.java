@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.common.ApiResponse;
+import com.example.demo.common.Result;
 import com.example.demo.dto.CommentVO;
 import com.example.demo.dto.CreateCommentRequest;
 import com.example.demo.dto.PageResponse;
@@ -34,46 +34,46 @@ public class CommentController {
      * 创建评论
      */
     @PostMapping
-    public ApiResponse<CommentVO> createComment(
+    public Result<CommentVO> createComment(
             @AuthenticationPrincipal Long userId,
             @Valid @RequestBody CreateCommentRequest request) {
         CommentVO comment = commentService.createComment(userId, request);
-        return ApiResponse.success(comment);
+        return Result.success(comment);
     }
     
     /**
      * 获取文档评论列表
      */
     @GetMapping("/document/{documentId}")
-    public ApiResponse<PageResponse<CommentVO>> getDocumentComments(
+    public Result<PageResponse<CommentVO>> getDocumentComments(
             @PathVariable Long documentId,
             @AuthenticationPrincipal Long userId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize) {
         PageResponse<CommentVO> comments = commentService.getDocumentComments(
                 documentId, userId, page, pageSize);
-        return ApiResponse.success(comments);
+        return Result.success(comments);
     }
     
     /**
      * 删除评论
      */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteComment(
+    public Result<Void> deleteComment(
             @PathVariable Long id,
             @AuthenticationPrincipal Long userId) {
         commentService.deleteComment(id, userId);
-        return ApiResponse.success();
+        return Result.success();
     }
     
     /**
      * 标记评论已解决
      */
     @PutMapping("/{id}/resolve")
-    public ApiResponse<Void> resolveComment(
+    public Result<Void> resolveComment(
             @PathVariable Long id,
             @AuthenticationPrincipal Long userId) {
         commentService.resolveComment(id, userId);
-        return ApiResponse.success();
+        return Result.success();
     }
 }
