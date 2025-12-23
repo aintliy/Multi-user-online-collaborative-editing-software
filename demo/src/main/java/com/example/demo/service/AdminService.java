@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +30,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class AdminService {
     
+    private static final Set<String> ALLOWED_SYSTEM_ROLES = Set.of("ADMIN", "USER");
+    private static final Set<String> ALLOWED_USER_STATUS = Set.of("active", "disabled");
+
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final OperationLogService operationLogService;
@@ -87,9 +91,23 @@ public class AdminService {
         if (userId.equals(adminId)) {
             throw new BusinessException(ErrorCode.CANNOT_UPDATE_SELF_ROLE);
         }
-        
+
+        if (newRole == null || newRole.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
+        }
+        String normalizedRole = newRole.trim().toUpperCase();
+        if (!ALLOWED_SYSTEM_ROLES.contains(normalizedRole)) {
+            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
+        }
+
         String oldRole = user.getRole();
-        user.setRole(newRole);
+        if ("ADMIN".equals(oldRole) && !"ADMIN".equals(normalizedRole)) {
+            if (!hasOtherActiveAdmins(userId)) {
+                throw new BusinessException(ErrorCode.LAST_ADMIN_REQUIRED);
+            }
+        }
+
+        user.setRole(normalizedRole);
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
         
@@ -116,8 +134,22 @@ public class AdminService {
             throw new BusinessException(ErrorCode.CANNOT_UPDATE_SELF_STATUS);
         }
         
+        if (newStatus == null || newStatus.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+        String normalizedStatus = newStatus.trim().toLowerCase();
+        if (!ALLOWED_USER_STATUS.contains(normalizedStatus)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+
+        if ("ADMIN".equals(user.getRole()) && !"active".equals(normalizedStatus)) {
+            if (!hasOtherActiveAdmins(userId)) {
+                throw new BusinessException(ErrorCode.LAST_ADMIN_REQUIRED);
+            }
+        }
+
         String oldStatus = user.getStatus();
-        user.setStatus(newStatus);
+        user.setStatus(normalizedStatus);
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
         
@@ -143,7 +175,12 @@ public class AdminService {
         if (userId.equals(adminId)) {
             throw new BusinessException(ErrorCode.CANNOT_DELETE_SELF);
         }
-        
+        if ("ADMIN".equals(user.getRole())) {
+            if (!hasOtherActiveAdmins(userId)) {
+                throw new BusinessException(ErrorCode.LAST_ADMIN_REQUIRED);
+            }
+        }
+
         // 软删除
         user.setStatus("deleted");
         user.setUpdatedAt(LocalDateTime.now());
@@ -200,6 +237,17 @@ public class AdminService {
         return stats;
     }
     
+    private boolean hasOtherActiveAdmins(Long excludedUserId) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
+            .eq(User::getRole, "ADMIN")
+            .eq(User::getStatus, "active");
+        if (excludedUserId != null) {
+            wrapper.ne(User::getId, excludedUserId);
+        }
+        Long count = userMapper.selectCount(wrapper);
+        return count != null && count > 0;
+    }
+
     /**
      * 转换为UserVO
      */

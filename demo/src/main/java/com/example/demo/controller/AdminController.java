@@ -1,13 +1,23 @@
 package com.example.demo.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demo.common.Result;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.dto.UserVO;
 import com.example.demo.service.AdminService;
+import com.example.demo.service.DocumentService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
 
 /**
  * 管理员控制器
@@ -19,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
     
     private final AdminService adminService;
+    private final DocumentService documentService;
     
     /**
      * 获取用户列表
@@ -88,5 +99,16 @@ public class AdminController {
     public Result<AdminService.SystemStatsVO> getSystemStats() {
         AdminService.SystemStatsVO stats = adminService.getSystemStats();
         return Result.success(stats);
+    }
+
+    /**
+     * 管理员直接删除任意文档
+     */
+    @DeleteMapping("/documents/{documentId}")
+    public Result<Void> deleteDocumentAsAdmin(
+            @AuthenticationPrincipal Long adminId,
+            @PathVariable Long documentId) {
+        documentService.deleteDocument(documentId, adminId);
+        return Result.success();
     }
 }

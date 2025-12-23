@@ -42,7 +42,7 @@ public class Document {
     private String content;
     
     /**
-     * 文档类型：doc / sheet / slide / markdown
+     * 文档类型：markdown / docx / txt
      */
     @TableField("doc_type")
     private String docType;

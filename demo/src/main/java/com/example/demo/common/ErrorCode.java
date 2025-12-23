@@ -54,6 +54,7 @@ public enum ErrorCode {
     CANNOT_UPDATE_SELF_ROLE(3670, "不能修改自己的角色"),
     CANNOT_UPDATE_SELF_STATUS(3671, "不能修改自己的状态"),
     CANNOT_DELETE_SELF(3672, "不能删除自己"),
+    LAST_ADMIN_REQUIRED(3673, "系统至少保留一名活跃管理员"),
     
     // 文件相关 3690-3699
     FILE_EMPTY(3690, "文件为空"),

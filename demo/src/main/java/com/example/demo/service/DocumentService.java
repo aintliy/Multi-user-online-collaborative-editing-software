@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.demo.common.BusinessException;
+import com.example.demo.common.DocumentConstants;
 import com.example.demo.common.ErrorCode;
 import com.example.demo.dto.CreateDocumentRequest;
 import com.example.demo.dto.DocumentVO;
@@ -47,7 +48,7 @@ public class DocumentService {
         Document document = new Document();
         document.setTitle(request.getTitle());
         document.setOwnerId(userId);
-        document.setDocType(request.getType() != null ? request.getType() : "doc");
+        document.setDocType(normalizeDocType(request.getType()));
         document.setVisibility(request.getVisibility() != null ? request.getVisibility() : "private");
         document.setContent("");
         document.setStatus("active");
@@ -129,6 +130,9 @@ public class DocumentService {
         
         // 只有所有者或管理员可以删除
         User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
         if (!document.getOwnerId().equals(userId) && !"ADMIN".equals(user.getRole())) {
             throw new BusinessException(ErrorCode.DOCUMENT_NO_PERMISSION);
         }
@@ -326,5 +330,16 @@ public class DocumentService {
         vo.setCanEdit(hasEditPermission(document.getId(), currentUserId));
         
         return vo;
+    }
+
+    private String normalizeDocType(String docType) {
+        if (docType == null || docType.trim().isEmpty()) {
+            return DocumentConstants.DEFAULT_DOC_TYPE;
+        }
+        String normalized = docType.trim().toLowerCase();
+        if (!DocumentConstants.SUPPORTED_DOC_TYPES.contains(normalized)) {
+            throw new BusinessException(ErrorCode.FILE_TYPE_INVALID);
+        }
+        return normalized;
     }
 }

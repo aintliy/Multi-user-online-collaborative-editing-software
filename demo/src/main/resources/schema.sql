@@ -53,7 +53,7 @@ CREATE TABLE documents (
   title          VARCHAR(255) NOT NULL,
   owner_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content        TEXT,                          -- 当前最新「已提交」内容
-  doc_type       VARCHAR(20) DEFAULT 'doc',     -- doc / sheet / slide / markdown
+  doc_type       VARCHAR(20) DEFAULT 'markdown',-- markdown / docx / txt
   visibility     VARCHAR(20) DEFAULT 'private', -- private / public
   tags           VARCHAR(255),                  -- 标签，逗号分隔
   folder_id      VARCHAR(50),                   -- 文件夹ID（可选）

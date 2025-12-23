@@ -13,7 +13,7 @@ public class CreateDocumentRequest {
     private String title;
     
     /**
-     * 文档类型：doc / sheet / slide / markdown
+     * 文档类型：markdown / docx / txt
      */
     private String type;
     
