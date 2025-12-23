@@ -63,6 +63,7 @@ public class Task {
     /**
      * 任务优先级：LOW-低，MEDIUM-中，HIGH-高
      */
+    @TableField("priority")
     private String priority;   
     
     /**

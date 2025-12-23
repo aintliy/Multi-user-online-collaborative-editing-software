@@ -245,6 +245,7 @@ CREATE TABLE tasks (
   title        VARCHAR(255) NOT NULL,
   description  TEXT,
   status       VARCHAR(20) DEFAULT 'TODO', -- TODO / DOING / DONE
+  priority     VARCHAR(20) DEFAULT 'MEDIUM', -- LOW / MEDIUM / HIGH
   due_date     DATE,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
   updated_at   TIMESTAMPTZ DEFAULT NOW()

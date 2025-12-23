@@ -1,39 +1,29 @@
-'use client';
-
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
+import { Space_Grotesk } from "next/font/google";
+import "antd/dist/reset.css";
 import "./globals.css";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ConfigProvider } from 'antd';
-import zhCN from 'antd/locale/zh_CN';
-import AppLayout from '@/components/AppLayout';
+import AppProviders from "@/components/providers/AppProviders";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const display = Space_Grotesk({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const metadata: Metadata = {
+  title: "多人协作文档工作台",
+  description: "基于 Next.js + Ant Design 的多人在线协作编辑平台",
+};
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="zh-CN">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <ConfigProvider locale={zhCN}>
-          <AuthProvider>
-            <AppLayout>
-              {children}
-            </AppLayout>
-          </AuthProvider>
-        </ConfigProvider>
+    <html lang="zh-CN" className={display.variable}>
+      <body>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
