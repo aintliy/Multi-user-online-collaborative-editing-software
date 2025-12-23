@@ -32,6 +32,8 @@ public class OperationLog {
     /**
      * 操作类型：CREATE_DOC-创建文档，DELETE_DOC-删除文档，UPDATE_PERMISSION-更新权限等
      */
+
+    @TableField("action")
     private String action;
     
     /**
@@ -49,6 +51,7 @@ public class OperationLog {
     /**
      * 操作详情
      */
+    @TableField("detail")
     private String detail;
     
     /**

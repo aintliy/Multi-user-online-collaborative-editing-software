@@ -20,8 +20,10 @@ public class TaskVO {
     private String description;
     private String status; // TODO / DOING / DONE
     
-    private String priority;
-    
+     /**
+     * 任务优先级：LOW-低，MEDIUM-中，HIGH-高
+     */
+    private String priority; 
     private LocalDate dueDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

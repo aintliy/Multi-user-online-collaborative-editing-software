@@ -38,6 +38,7 @@ public class ChatMessage {
     /**
      * 消息内容
      */
+    @TableField("content")
     private String content;
     
     /**

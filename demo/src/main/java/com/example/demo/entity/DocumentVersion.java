@@ -38,6 +38,7 @@ public class DocumentVersion {
     /**
      * 本次提交的完整内容快照
      */
+    @TableField("content")
     private String content;
     
     /**

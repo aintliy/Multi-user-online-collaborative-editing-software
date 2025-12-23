@@ -38,6 +38,7 @@ public class UserFriend {
     /**
      * 关系状态：PENDING-待处理，ACCEPTED-已接受，REJECTED-已拒绝，BLOCKED-已屏蔽
      */
+    @TableField("status")
     private String status;
     
     /**

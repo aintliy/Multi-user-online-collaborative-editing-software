@@ -1,8 +1,13 @@
 package com.example.demo.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
-import lombok.Data;
 import java.time.LocalDateTime;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+import lombok.Data;
 
 /**
  * 用户实体（重构版）
@@ -28,21 +33,25 @@ public class User {
     /**
      * 用户名
      */
+    @TableField("username")
     private String username;
     
     /**
      * 邮箱（唯一）
      */
+    @TableField("email")
     private String email;
     
     /**
      * 手机号
      */
+    @TableField("phone")
     private String phone;
     
     /**
      * 密码（BCrypt加密）
      */
+    @TableField("password")
     private String password;
     
     /**
@@ -54,16 +63,19 @@ public class User {
     /**
      * 个人简介
      */
+    @TableField("profile")
     private String profile;
     
     /**
      * 用户状态：active-正常，disabled-禁用
      */
+    @TableField("status")
     private String status;
     
     /**
      * 系统角色：ADMIN-管理员，USER-普通用户
      */
+    @TableField("role") 
     private String role;
     
     /**

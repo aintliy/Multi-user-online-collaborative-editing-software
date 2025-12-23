@@ -32,11 +32,13 @@ public class DocumentInviteLink {
     /**
      * 邀请令牌（随机生成）
      */
+    @TableField("token")
     private String token;
     
     /**
      * 通过链接加入后的默认角色：EDITOR / VIEWER
      */
+    @TableField("role")
     private String role;
     
     /**

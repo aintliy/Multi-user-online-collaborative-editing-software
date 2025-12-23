@@ -38,6 +38,7 @@ public class DocumentCollaborator {
     /**
      * 角色：EDITOR-可编辑，VIEWER-只读
      */
+    @TableField("role")
     private String role;
     
     /**

@@ -1,8 +1,13 @@
 package com.example.demo.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
-import lombok.Data;
 import java.time.LocalDateTime;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
+import lombok.Data;
 
 /**
  * 文档协作申请实体（加入工作区申请）
@@ -33,11 +38,13 @@ public class DocumentWorkspaceRequest {
     /**
      * 申请状态：PENDING-待处理，APPROVED-已批准，REJECTED-已拒绝
      */
+    @TableField("status")
     private String status;
     
     /**
      * 申请理由
      */
+    @TableField("message")
     private String message;
     
     /**

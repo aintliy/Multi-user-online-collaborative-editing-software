@@ -38,6 +38,7 @@ public class Comment {
     /**
      * 评论内容
      */
+    @TableField("content")
     private String content;
     
     /**
@@ -55,6 +56,7 @@ public class Comment {
     /**
      * 评论状态：open-未解决，resolved-已解决
      */
+    @TableField("status")
     private String status;
     
     /**

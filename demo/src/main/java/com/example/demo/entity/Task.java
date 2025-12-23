@@ -45,22 +45,25 @@ public class Task {
     /**
      * 任务标题
      */
+    @TableField("title")
     private String title;
     
     /**
      * 任务描述
      */
+    @TableField("description")
     private String description;
     
     /**
      * 任务状态：TODO-待办，DOING-进行中，DONE-已完成
      */
+    @TableField("status")
     private String status;
     
     /**
      * 任务优先级：LOW-低，MEDIUM-中，HIGH-高
      */
-    private String priority;
+    private String priority;   
     
     /**
      * 关联文档ID

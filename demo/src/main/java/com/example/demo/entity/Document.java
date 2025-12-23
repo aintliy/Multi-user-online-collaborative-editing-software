@@ -26,6 +26,7 @@ public class Document {
     /**
      * 文档标题
      */
+    @TableField("title")
     private String title;
     
     /**
@@ -37,6 +38,7 @@ public class Document {
     /**
      * 当前最新「已提交」内容
      */
+    @TableField("content")
     private String content;
     
     /**
@@ -48,11 +50,13 @@ public class Document {
     /**
      * 可见性：private-私有，public-公开
      */
+    @TableField("visibility")
     private String visibility;
     
     /**
      * 标签（逗号分隔）
      */
+    @TableField("tags")
     private String tags;
     
     /**
@@ -64,6 +68,7 @@ public class Document {
     /**
      * 状态：active-正常，deleted-已删除
      */
+    @TableField("status")
     private String status;
     
     /**

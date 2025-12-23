@@ -32,6 +32,7 @@ public class Notification {
     /**
      * 通知类型：COMMENT-评论，TASK-任务，FRIEND_REQUEST-好友请求，WORKSPACE_REQUEST-协作申请等
      */
+    @TableField("type")
     private String type;
     
     /**
@@ -43,6 +44,7 @@ public class Notification {
     /**
      * 通知内容
      */
+    @TableField("content")
     private String content;
     
     /**
