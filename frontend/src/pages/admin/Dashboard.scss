@@ -1,0 +1,22 @@
+.admin-dashboard {
+  h2 {
+    margin-bottom: 24px;
+  }
+  
+  .ant-card {
+    .ant-statistic-title {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .ant-statistic-content {
+      font-size: 24px;
+    }
+
+    .anticon {
+      font-size: 20px;
+      margin-right: 8px;
+      color: #1890ff;
+    }
+  }
+}

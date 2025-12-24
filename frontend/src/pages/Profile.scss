@@ -1,0 +1,23 @@
+.profile-page {
+  max-width: 600px;
+  margin: 0 auto;
+
+  .profile-card {
+    .avatar-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 0;
+    }
+
+    .user-info {
+      .ant-descriptions-item-label {
+        width: 100px;
+      }
+    }
+
+    .profile-form {
+      max-width: 400px;
+    }
+  }
+}

@@ -1,0 +1,49 @@
+.admin-layout {
+  min-height: 100vh;
+
+  .admin-sider {
+    position: relative;
+
+    .logo {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .back-link {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      padding: 12px 24px;
+      color: rgba(255, 255, 255, 0.65);
+      cursor: pointer;
+      transition: color 0.3s;
+
+      &:hover {
+        color: #fff;
+      }
+    }
+  }
+
+  .admin-header {
+    background: #fff;
+    padding: 0 24px;
+    font-size: 18px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .admin-content {
+    margin: 24px;
+    padding: 24px;
+    background: #fff;
+    border-radius: 8px;
+    min-height: calc(100vh - 64px - 48px);
+  }
+}

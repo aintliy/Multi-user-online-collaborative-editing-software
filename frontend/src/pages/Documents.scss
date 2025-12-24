@@ -1,0 +1,60 @@
+.documents-page {
+  .documents-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .document-card {
+    margin-bottom: 12px;
+
+    .ant-card-body {
+      padding: 16px;
+    }
+
+    .document-card-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .document-info {
+      flex: 1;
+    }
+
+    .document-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 8px;
+
+      .document-icon {
+        color: #1890ff;
+        font-size: 18px;
+      }
+
+      .ant-tag {
+        margin-left: 8px;
+      }
+    }
+
+    .document-meta {
+      font-size: 12px;
+      color: #999;
+
+      .owner {
+        margin-left: 16px;
+      }
+    }
+  }
+
+  .ant-tree {
+    .ant-tree-node-content-wrapper {
+      display: flex;
+      align-items: center;
+    }
+  }
+}
