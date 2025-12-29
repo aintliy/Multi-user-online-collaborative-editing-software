@@ -1,5 +1,15 @@
 package com.example.backend.service;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.backend.dto.PageResponse;
 import com.example.backend.dto.auth.UserDTO;
 import com.example.backend.dto.document.DocumentDTO;
@@ -11,16 +21,8 @@ import com.example.backend.exception.ErrorCode;
 import com.example.backend.repository.DocumentRepository;
 import com.example.backend.repository.OperationLogRepository;
 import com.example.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 管理员服务
@@ -32,6 +34,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final OperationLogRepository operationLogRepository;
+    private final DocumentService documentService;
     
     /**
      * 获取系统统计数据
@@ -151,8 +154,8 @@ public class AdminService {
         
         // 记录操作日志
         logOperation(documentId, "DELETE_DOCUMENT", "DOC", "删除文档: " + document.getTitle());
-        
-        documentRepository.delete(document);
+
+        documentService.deleteDocument(documentId, document.getOwner().getId(), true);
     }
     
     /**

@@ -13,6 +13,8 @@ public class ErrorCode {
     public static final int FORBIDDEN = 1003;
     public static final int TOO_MANY_REQUESTS = 1004;
     public static final int ACCESS_DENIED = 1005;
+    public static final int SYSTEM_ERROR = 1006;
+    public static final int FILE_NOT_FOUND = 1007;
     
     // 用户相关错误码 2xxx
     public static final int USER_NOT_FOUND = 2001;

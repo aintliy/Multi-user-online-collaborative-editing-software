@@ -1,11 +1,14 @@
 package com.example.backend.repository;
 
-import com.example.backend.entity.DocumentFolder;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.example.backend.entity.DocumentFolder;
 
 @Repository
 public interface DocumentFolderRepository extends JpaRepository<DocumentFolder, Long> {
@@ -21,4 +24,7 @@ public interface DocumentFolderRepository extends JpaRepository<DocumentFolder, 
     boolean existsByOwnerIdAndParentIdAndName(Long ownerId, Long parentId, String name);
     
     boolean existsByOwnerIdAndParentIsNullAndName(Long ownerId, String name);
+
+    @Query("SELECT f FROM DocumentFolder f WHERE f.owner.id = :ownerId AND f.parent.id = f.id")
+    Optional<DocumentFolder> findRootFolderByOwnerId(@Param("ownerId") Long ownerId);
 }

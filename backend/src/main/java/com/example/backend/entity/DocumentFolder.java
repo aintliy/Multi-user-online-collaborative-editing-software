@@ -41,7 +41,7 @@ public class DocumentFolder {
     private String name;
     
     /**
-     * 父级文件夹ID，NULL表示根目录下的一级文件夹
+     * 父级文件夹ID
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")

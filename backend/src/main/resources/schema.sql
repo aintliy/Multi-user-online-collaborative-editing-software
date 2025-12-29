@@ -1,0 +1,311 @@
+-- Active: 1766324267089@@127.0.0.1@5432@postgres@collab_db
+-- =====================================================
+-- 多人在线协作编辑软件 - PostgreSQL 数据库建表脚本
+-- 创建时间: 2024-12-24
+-- 数据库: PostgreSQL
+-- =====================================================
+
+-- =====================================================
+-- 1. 用户表 (users)
+-- =====================================================
+CREATE TABLE users (
+  id           BIGSERIAL PRIMARY KEY,
+  -- 对外展示与搜索使用的随机不可变 ID，例如 "uid_9f3a2c7b"
+  public_id    VARCHAR(32) NOT NULL UNIQUE,
+  username     VARCHAR(50)  NOT NULL,
+  email        VARCHAR(100) NOT NULL UNIQUE,
+  password     VARCHAR(255) NOT NULL,
+  avatar_url   VARCHAR(255),
+  profile      TEXT,
+  status       VARCHAR(20)  DEFAULT 'active',       -- active / disabled
+  role         VARCHAR(20)  DEFAULT 'USER',         -- ADMIN / USER（系统角色）
+  created_at   TIMESTAMP  DEFAULT NOW(),
+  updated_at   TIMESTAMP  DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_public_id ON users(public_id);
+
+COMMENT ON TABLE users IS '用户表';
+COMMENT ON COLUMN users.public_id IS '对外展示的随机不可变用户ID';
+COMMENT ON COLUMN users.role IS '系统角色: ADMIN-管理员, USER-普通用户';
+COMMENT ON COLUMN users.status IS '用户状态: active-正常, disabled-已禁用';
+
+-- =====================================================
+-- 2. 文档文件夹表 (document_folders)
+-- =====================================================
+CREATE TABLE document_folders (
+  id           BIGSERIAL PRIMARY KEY,
+  owner_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name         VARCHAR(255) NOT NULL,
+  parent_id    BIGINT REFERENCES document_folders(id) ON DELETE CASCADE,
+  created_at   TIMESTAMP DEFAULT NOW(),
+  updated_at   TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT uq_folder_name_per_parent UNIQUE (owner_id, parent_id, name)
+);
+
+CREATE INDEX idx_doc_folders_owner ON document_folders(owner_id);
+CREATE INDEX idx_doc_folders_parent ON document_folders(parent_id);
+
+COMMENT ON TABLE document_folders IS '文档文件夹表，支持多级嵌套';
+COMMENT ON COLUMN document_folders.parent_id IS '父文件夹ID，NULL表示根目录下的一级文件夹';
+
+-- =====================================================
+-- 3. 文档表 (documents)
+-- =====================================================
+CREATE TABLE documents (
+  id             BIGSERIAL PRIMARY KEY,
+  title          VARCHAR(255) NOT NULL,
+  owner_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content        TEXT,
+  doc_type       VARCHAR(20) DEFAULT 'markdown',
+  visibility     VARCHAR(20) DEFAULT 'private',
+  tags           VARCHAR(255),
+  folder_id      BIGINT REFERENCES document_folders(id) ON DELETE SET NULL,
+  status         VARCHAR(20) DEFAULT 'active',
+  forked_from_id BIGINT REFERENCES documents(id),
+  storage_path   VARCHAR(512),
+  created_at     TIMESTAMP DEFAULT NOW(),
+  updated_at     TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_documents_owner ON documents(owner_id);
+CREATE INDEX idx_documents_visibility ON documents(visibility);
+CREATE INDEX idx_documents_forked ON documents(forked_from_id);
+CREATE INDEX idx_documents_folder ON documents(folder_id);
+CREATE INDEX idx_documents_status ON documents(status);
+
+COMMENT ON TABLE documents IS '文档表';
+COMMENT ON COLUMN documents.doc_type IS '文档类型: markdown / docx / txt / sheet / slide';
+COMMENT ON COLUMN documents.visibility IS '可见性: private-私有, public-公开';
+COMMENT ON COLUMN documents.folder_id IS '所属文件夹ID，NULL表示在根目录';
+COMMENT ON COLUMN documents.forked_from_id IS '克隆来源文档ID';
+COMMENT ON COLUMN documents.storage_path IS '物理文件存储相对路径，格式: {ownerId}/{folderId}/，folderId为空表示用户根目录';
+
+-- =====================================================
+-- 4. 文档版本表 (document_versions)
+-- =====================================================
+CREATE TABLE document_versions (
+  id             BIGSERIAL PRIMARY KEY,
+  document_id    BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  version_no     INTEGER NOT NULL,
+  content        TEXT   NOT NULL,
+  commit_message VARCHAR(255),
+  created_by     BIGINT REFERENCES users(id),
+  created_at     TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT uq_doc_version UNIQUE (document_id, version_no)
+);
+
+CREATE INDEX idx_doc_versions_document ON document_versions(document_id);
+CREATE INDEX idx_doc_versions_created_by ON document_versions(created_by);
+
+COMMENT ON TABLE document_versions IS '文档版本表，类似Git提交历史';
+COMMENT ON COLUMN document_versions.version_no IS '文档内部递增版本号';
+COMMENT ON COLUMN document_versions.commit_message IS '提交说明';
+
+-- =====================================================
+-- 5. 文档协作者表 (document_collaborators)
+-- =====================================================
+CREATE TABLE document_collaborators (
+  id           BIGSERIAL PRIMARY KEY,
+  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invited_by   BIGINT REFERENCES users(id),
+  created_at   TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT uq_doc_collaborator UNIQUE (document_id, user_id)
+);
+
+CREATE INDEX idx_doc_collaborators_document ON document_collaborators(document_id);
+CREATE INDEX idx_doc_collaborators_user ON document_collaborators(user_id);
+
+COMMENT ON TABLE document_collaborators IS '文档协作者表';
+COMMENT ON COLUMN document_collaborators.invited_by IS '邀请人ID';
+
+-- =====================================================
+-- 6. 文档协作申请表 (document_workspace_requests)
+-- =====================================================
+CREATE TABLE document_workspace_requests (
+  id           BIGSERIAL PRIMARY KEY,
+  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  applicant_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  message      VARCHAR(255),
+  created_at   TIMESTAMP DEFAULT NOW(),
+  handled_at   TIMESTAMP,
+  handled_by   BIGINT REFERENCES users(id)
+);
+
+CREATE INDEX idx_workspace_requests_document ON document_workspace_requests(document_id);
+CREATE INDEX idx_workspace_requests_applicant ON document_workspace_requests(applicant_id);
+CREATE INDEX idx_workspace_requests_status ON document_workspace_requests(status);
+
+-- 部分唯一索引：仅当 status = 'PENDING' 时同一用户对同一文档不能重复申请
+CREATE UNIQUE INDEX uq_pending_request ON document_workspace_requests(document_id, applicant_id, status) 
+  WHERE status = 'PENDING';
+
+COMMENT ON TABLE document_workspace_requests IS '文档协作申请表';
+COMMENT ON COLUMN document_workspace_requests.status IS '申请状态: PENDING-待处理, APPROVED-已通过, REJECTED-已拒绝';
+
+-- =====================================================
+-- 7. 文档邀请链接表 (document_invite_links)
+-- =====================================================
+CREATE TABLE document_invite_links (
+  id           BIGSERIAL PRIMARY KEY,
+  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  token        VARCHAR(64) NOT NULL UNIQUE,
+  max_uses     INTEGER,
+  used_count   INTEGER DEFAULT 0,
+  expires_at   TIMESTAMP,
+  created_by   BIGINT REFERENCES users(id),
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_invite_links_document ON document_invite_links(document_id);
+CREATE INDEX idx_invite_links_token ON document_invite_links(token);
+
+COMMENT ON TABLE document_invite_links IS '文档邀请链接表';
+COMMENT ON COLUMN document_invite_links.token IS '邀请链接中的随机token';
+COMMENT ON COLUMN document_invite_links.max_uses IS '最大可用次数，NULL表示无限制';
+
+-- =====================================================
+-- 8. 好友关系表 (user_friends)
+-- =====================================================
+CREATE TABLE user_friends (
+  id           BIGSERIAL PRIMARY KEY,
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  created_at   TIMESTAMP DEFAULT NOW(),
+  updated_at   TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT uq_user_friend UNIQUE (user_id, friend_id)
+);
+
+CREATE INDEX idx_user_friends_user ON user_friends(user_id);
+CREATE INDEX idx_user_friends_friend ON user_friends(friend_id);
+CREATE INDEX idx_user_friends_status ON user_friends(status);
+
+COMMENT ON TABLE user_friends IS '好友关系表';
+COMMENT ON COLUMN user_friends.status IS '好友状态: PENDING-待确认, ACCEPTED-已接受, REJECTED-已拒绝, BLOCKED-已屏蔽';
+
+-- =====================================================
+-- 9. 评论表 (comments)
+-- =====================================================
+CREATE TABLE comments (
+  id                   BIGSERIAL PRIMARY KEY,
+  document_id          BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  user_id              BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content              TEXT NOT NULL,
+  reply_to_comment_id  BIGINT REFERENCES comments(id) ON DELETE SET NULL,
+  range_info           TEXT,
+  status               VARCHAR(20) DEFAULT 'open',
+  created_at           TIMESTAMP DEFAULT NOW(),
+  updated_at           TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_comments_document ON comments(document_id);
+CREATE INDEX idx_comments_user ON comments(user_id);
+CREATE INDEX idx_comments_reply_to ON comments(reply_to_comment_id);
+
+COMMENT ON TABLE comments IS '评论表';
+COMMENT ON COLUMN comments.range_info IS '选中范围信息（JSON字符串）';
+COMMENT ON COLUMN comments.status IS '评论状态: open-打开, resolved-已解决';
+
+-- =====================================================
+-- 10. 文档内聊天消息表 (chat_messages)
+-- =====================================================
+CREATE TABLE chat_messages (
+  id           BIGSERIAL PRIMARY KEY,
+  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  sender_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content      TEXT   NOT NULL,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_chat_messages_document ON chat_messages(document_id);
+CREATE INDEX idx_chat_messages_sender ON chat_messages(sender_id);
+CREATE INDEX idx_chat_messages_created ON chat_messages(created_at DESC);
+
+COMMENT ON TABLE chat_messages IS '文档内聊天消息表（持久化）';
+
+-- =====================================================
+-- 11. 通知表 (notifications)
+-- =====================================================
+CREATE TABLE notifications (
+  id            BIGSERIAL PRIMARY KEY,
+  receiver_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type          VARCHAR(50) NOT NULL,
+  reference_id  BIGINT,
+  content       TEXT NOT NULL,
+  is_read       BOOLEAN DEFAULT FALSE,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_receiver ON notifications(receiver_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
+
+COMMENT ON TABLE notifications IS '通知表';
+COMMENT ON COLUMN notifications.type IS '通知类型: COMMENT-评论, TASK-任务, PERMISSION-权限等';
+COMMENT ON COLUMN notifications.reference_id IS '关联业务实体ID';
+
+-- =====================================================
+-- 12. 任务表 (tasks)
+-- =====================================================
+CREATE TABLE tasks (
+  id           BIGSERIAL PRIMARY KEY,
+  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  creator_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assignee_id  BIGINT REFERENCES users(id),
+  title        VARCHAR(255) NOT NULL,
+  description  TEXT,
+  status       VARCHAR(20) DEFAULT 'todo',
+  priority     VARCHAR(20) DEFAULT 'MEDIUM',
+  due_date     DATE,
+  created_at   TIMESTAMP DEFAULT NOW(),
+  updated_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_tasks_document ON tasks(document_id);
+CREATE INDEX idx_tasks_creator ON tasks(creator_id);
+CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+
+COMMENT ON TABLE tasks IS '任务表';
+COMMENT ON COLUMN tasks.status IS '任务状态: todo-待办, doing-进行中, done-已完成';
+COMMENT ON COLUMN tasks.priority IS '优先级: LOW-低, MEDIUM-中, HIGH-高';
+
+-- =====================================================
+-- 13. 操作日志表 (operation_logs)
+-- =====================================================
+CREATE TABLE operation_logs (
+  id           BIGSERIAL PRIMARY KEY,
+  user_id      BIGINT REFERENCES users(id),
+  action       VARCHAR(50) NOT NULL,
+  target_type  VARCHAR(50) NOT NULL,
+  target_id    BIGINT,
+  detail       TEXT,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_op_logs_user ON operation_logs(user_id);
+CREATE INDEX idx_op_logs_action ON operation_logs(action);
+CREATE INDEX idx_op_logs_created ON operation_logs(created_at DESC);
+
+COMMENT ON TABLE operation_logs IS '操作日志表';
+COMMENT ON COLUMN operation_logs.action IS '操作类型: CREATE_DOC, DELETE_DOC, UPDATE_PERMISSION等';
+COMMENT ON COLUMN operation_logs.target_type IS '目标类型: DOC-文档, USER-用户, ROLE-角色, PERMISSION-权限';
+
+-- =====================================================
+-- 建表完成
+-- =====================================================
+
+-- 注意事项：
+-- 1. 密码重置令牌和注册验证码使用 Redis 存储，无需创建数据库表
+-- 2. Redis 键格式：
+--    - 密码重置：pwd_reset:{token} -> userId，TTL 5分钟
+--    - 注册验证码：reg_code:{email} -> code，TTL 5分钟
+--    - 访问频率限制：rate_limit:{key}，可自定义 TTL
+-- 3. 所有时间戳字段使用 TIMESTAMP 类型（不带时区）
+-- 4. 外键约束使用 ON DELETE CASCADE 保证数据一致性
+-- 5. 部分字段使用 ON DELETE SET NULL 避免级联删除

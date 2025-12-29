@@ -1,16 +1,35 @@
 package com.example.backend.controller;
 
+import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.example.backend.dto.ApiResponse;
 import com.example.backend.dto.PageResponse;
-import com.example.backend.dto.document.*;
+import com.example.backend.dto.document.CloneDocumentRequest;
+import com.example.backend.dto.document.CommitDocumentRequest;
+import com.example.backend.dto.document.CreateDocumentRequest;
+import com.example.backend.dto.document.DocumentDTO;
+import com.example.backend.dto.document.DocumentVersionDTO;
+import com.example.backend.dto.document.MoveDocumentRequest;
+import com.example.backend.dto.document.UpdateDocumentRequest;
 import com.example.backend.entity.User;
 import com.example.backend.service.DocumentService;
 import com.example.backend.service.UserService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
 
 /**
  * 文档控制器
@@ -32,6 +51,18 @@ public class DocumentController {
         User user = userService.getUserByEmail(userDetails.getUsername());
         DocumentDTO document = documentService.createDocument(user.getId(), request);
         return ApiResponse.success("创建成功", document);
+    }
+
+    /**
+     * 导入文档
+     */
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<DocumentDTO> importDocument(@AuthenticationPrincipal UserDetails userDetails,
+                                                    @RequestParam(value = "folderId", required = false) Long folderId,
+                                                    @RequestPart("file") MultipartFile file) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        DocumentDTO document = documentService.importDocument(user.getId(), folderId, file);
+        return ApiResponse.success("导入成功", document);
     }
     
     /**

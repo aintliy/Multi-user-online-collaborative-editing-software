@@ -1,5 +1,13 @@
 package com.example.backend.service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.springframework.stereotype.Service;
+
 import com.example.backend.entity.Document;
 import com.example.backend.exception.BusinessException;
 import com.example.backend.exception.ErrorCode;
@@ -9,15 +17,9 @@ import com.lowagie.text.DocumentException;
 import com.lowagie.text.Font;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
-import org.springframework.stereotype.Service;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 
 /**
  * 文档导出服务
@@ -29,6 +31,7 @@ public class DocumentExportService {
     
     private final DocumentRepository documentRepository;
     private final DocumentCollaboratorRepository collaboratorRepository;
+    private final FileStorageService fileStorageService;
     
     /**
      * 导出为Word文档
@@ -57,7 +60,21 @@ public class DocumentExportService {
             }
             
             doc.write(out);
-            return out.toByteArray();
+            byte[] exportedBytes = out.toByteArray();
+            
+            // 保存导出的文件到文档存储目录
+            if (document.getStoragePath() != null) {
+                try {
+                    String fileName = sanitizeFileName(document.getTitle()) + ".docx";
+                    fileStorageService.saveBytes(document.getStoragePath(), fileName, exportedBytes);
+                    log.debug("Word文件已保存到存储目录: {}", document.getStoragePath() + fileName);
+                } catch (Exception e) {
+                    log.warn("保存Word文件到存储目录失败", e);
+                    // 不影响导出流程
+                }
+            }
+            
+            return exportedBytes;
         }
     }
     
@@ -87,7 +104,21 @@ public class DocumentExportService {
             }
             
             pdfDoc.close();
-            return out.toByteArray();
+            byte[] exportedBytes = out.toByteArray();
+            
+            // 保存导出的文件到文档存储目录
+            if (document.getStoragePath() != null) {
+                try {
+                    String fileName = sanitizeFileName(document.getTitle()) + ".pdf";
+                    fileStorageService.saveBytes(document.getStoragePath(), fileName, exportedBytes);
+                    log.debug("PDF文件已保存到存储目录: {}", document.getStoragePath() + fileName);
+                } catch (Exception e) {
+                    log.warn("保存PDF文件到存储目录失败", e);
+                    // 不影响导出流程
+                }
+            }
+            
+            return exportedBytes;
         }
     }
     
@@ -127,6 +158,9 @@ public class DocumentExportService {
     private Document getDocumentWithAccess(Long documentId, Long userId) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在"));
+        if (isDeleted(document)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在或已被删除");
+        }
         
         // 检查访问权限
         boolean isOwner = document.getOwner().getId().equals(userId);
@@ -138,5 +172,21 @@ public class DocumentExportService {
         }
         
         return document;
+    }
+
+    private boolean isDeleted(Document document) {
+        return document == null || "deleted".equalsIgnoreCase(document.getStatus())
+                || document.getFolder() == null || document.getFolder().getParent() == null;
+    }
+    
+    /**
+     * 清理文件名，移除不安全字符
+     */
+    private String sanitizeFileName(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return "document";
+        }
+        // 移除或替换不安全的文件系统字符
+        return fileName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
     }
 }

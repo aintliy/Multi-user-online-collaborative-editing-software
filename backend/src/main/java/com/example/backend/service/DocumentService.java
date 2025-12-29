@@ -1,22 +1,42 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.PageResponse;
-import com.example.backend.dto.document.*;
-import com.example.backend.entity.*;
-import com.example.backend.exception.BusinessException;
-import com.example.backend.exception.ErrorCode;
-import com.example.backend.repository.*;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.example.backend.dto.PageResponse;
+import com.example.backend.dto.document.CloneDocumentRequest;
+import com.example.backend.dto.document.CommitDocumentRequest;
+import com.example.backend.dto.document.CreateDocumentRequest;
+import com.example.backend.dto.document.DocumentDTO;
+import com.example.backend.dto.document.DocumentVersionDTO;
+import com.example.backend.dto.document.MoveDocumentRequest;
+import com.example.backend.dto.document.UpdateDocumentRequest;
+import com.example.backend.entity.Document;
+import com.example.backend.entity.DocumentFolder;
+import com.example.backend.entity.DocumentVersion;
+import com.example.backend.entity.User;
+import com.example.backend.exception.BusinessException;
+import com.example.backend.exception.ErrorCode;
+import com.example.backend.repository.DocumentCollaboratorRepository;
+import com.example.backend.repository.DocumentFolderRepository;
+import com.example.backend.repository.DocumentRepository;
+import com.example.backend.repository.DocumentVersionRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 文档服务
@@ -25,12 +45,16 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class DocumentService {
+
+    private static final String STATUS_ACTIVE = "active";
+    private static final String STATUS_DELETED = "deleted";
     
     private final DocumentRepository documentRepository;
     private final DocumentFolderRepository folderRepository;
     private final DocumentVersionRepository versionRepository;
     private final DocumentCollaboratorRepository collaboratorRepository;
     private final UserService userService;
+    private final FileStorageService fileStorageService;
     
     /**
      * 创建文档
@@ -38,16 +62,10 @@ public class DocumentService {
     @Transactional
     public DocumentDTO createDocument(Long userId, CreateDocumentRequest request) {
         User owner = userService.getUserById(userId);
-        
-        DocumentFolder folder = null;
-        if (request.getFolderId() != null) {
-            folder = folderRepository.findById(request.getFolderId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.FOLDER_NOT_FOUND, "文件夹不存在"));
-            // 验证文件夹是否属于当前用户
-            if (!folder.getOwner().getId().equals(userId)) {
-                throw new BusinessException(ErrorCode.FORBIDDEN, "无权限操作此文件夹");
-            }
-        }
+        DocumentFolder folder = resolveFolder(userId, request.getFolderId());
+
+        // 创建物理存储目录并获取相对路径
+        String storagePath = fileStorageService.createDocumentStoragePath(userId, folder.getId());
         
         Document document = Document.builder()
                 .title(request.getTitle())
@@ -56,7 +74,8 @@ public class DocumentService {
                 .visibility(request.getVisibility() != null ? request.getVisibility() : "private")
                 .folder(folder)
                 .content("")
-                .status("active")
+                .storagePath(storagePath)
+                .status(STATUS_ACTIVE)
                 .build();
         
         document = documentRepository.save(document);
@@ -71,7 +90,7 @@ public class DocumentService {
      * 获取文档详情
      */
     public DocumentDTO getDocument(Long documentId, Long userId) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         // 检查访问权限
         boolean canAccess = checkDocumentAccess(document, userId);
@@ -88,7 +107,7 @@ public class DocumentService {
      */
     @Transactional
     public DocumentDTO updateDocument(Long documentId, Long userId, UpdateDocumentRequest request) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         // 只有所有者可以更新元信息
         if (!document.getOwner().getId().equals(userId)) {
@@ -114,7 +133,7 @@ public class DocumentService {
      */
     @Transactional
     public DocumentVersionDTO commitDocument(Long documentId, Long userId, CommitDocumentRequest request) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         // 检查编辑权限
         if (!checkDocumentEditPermission(document, userId)) {
@@ -150,14 +169,29 @@ public class DocumentService {
      */
     @Transactional
     public void deleteDocument(Long documentId, Long userId, boolean isAdmin) {
-        Document document = getDocumentById(documentId);
-        
+        Document document = getDocumentEntity(documentId);
+
         // 检查权限：所有者或管理员可删除
         if (!document.getOwner().getId().equals(userId) && !isAdmin) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权删除此文档");
         }
-        
-        documentRepository.delete(document);
+
+        if (isAdmin) {
+            if (document.getStoragePath() != null) {
+                fileStorageService.deleteDocumentStorage(document.getStoragePath());
+            }
+            documentRepository.delete(document);
+            return;
+        }
+
+        if (isDeletedDocument(document)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在或已被删除");
+        }
+
+        document.setFolder(null);
+        document.setStatus(STATUS_DELETED);
+        document.setVisibility("private");
+        documentRepository.save(document);
     }
     
     /**
@@ -167,16 +201,16 @@ public class DocumentService {
                                                    int page, int pageSize) {
         Pageable pageable = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
         Page<Document> documentPage;
+        DocumentFolder targetFolder = resolveFolder(userId, folderId);
         
         if (keyword != null && !keyword.isEmpty()) {
             documentPage = documentRepository.searchByOwnerAndKeyword(userId, keyword, pageable);
-        } else if (folderId != null) {
-            documentPage = documentRepository.findByOwnerIdAndFolderId(userId, folderId, pageable);
         } else {
-            documentPage = documentRepository.findByOwnerIdAndFolderIdIsNull(userId, pageable);
+            documentPage = documentRepository.findByOwnerIdAndFolderIdAndStatusNot(userId, targetFolder.getId(), STATUS_DELETED, pageable);
         }
         
         List<DocumentDTO> items = documentPage.getContent().stream()
+            .filter(doc -> !isDeletedDocument(doc) && !isFolderDeleted(doc.getFolder()))
                 .map(doc -> DocumentDTO.fromEntity(doc, userId, true))
                 .collect(Collectors.toList());
         
@@ -199,11 +233,12 @@ public class DocumentService {
         if (keyword != null && !keyword.isEmpty()) {
             documentPage = documentRepository.searchPublicDocuments(keyword, pageable);
         } else {
-            documentPage = documentRepository.findByVisibility("public", pageable);
+            documentPage = documentRepository.findByVisibilityAndStatusNot("public", STATUS_DELETED, pageable);
         }
         
         List<DocumentDTO> items = documentPage.getContent().stream()
-                .map(doc -> DocumentDTO.fromEntity(doc, userId, checkDocumentEditPermission(doc, userId)))
+            .filter(doc -> !isDeletedDocument(doc) && !isFolderDeleted(doc.getFolder()))
+            .map(doc -> DocumentDTO.fromEntity(doc, userId, checkDocumentEditPermission(doc, userId)))
                 .collect(Collectors.toList());
         
         return PageResponse.<DocumentDTO>builder()
@@ -219,7 +254,7 @@ public class DocumentService {
      */
     public PageResponse<DocumentVersionDTO> getDocumentVersions(Long documentId, Long userId, 
                                                                   int page, int pageSize) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         // 检查访问权限
         if (!checkDocumentAccess(document, userId)) {
@@ -245,7 +280,7 @@ public class DocumentService {
      * 获取文档版本详情
      */
     public DocumentVersionDTO getDocumentVersion(Long documentId, Long versionId, Long userId) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         if (!checkDocumentAccess(document, userId)) {
             throw new BusinessException(ErrorCode.DOCUMENT_ACCESS_DENIED, "无权访问此文档");
@@ -266,7 +301,7 @@ public class DocumentService {
      */
     @Transactional
     public DocumentVersionDTO rollbackVersion(Long documentId, Long versionId, Long userId) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         if (!checkDocumentEditPermission(document, userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权编辑此文档");
@@ -292,7 +327,7 @@ public class DocumentService {
      */
     @Transactional
     public DocumentDTO cloneDocument(Long documentId, Long userId, CloneDocumentRequest request) {
-        Document sourceDocument = getDocumentById(documentId);
+        Document sourceDocument = getActiveDocument(documentId);
         
         // 检查是否有查看权限
         if (!checkDocumentAccess(sourceDocument, userId)) {
@@ -301,14 +336,11 @@ public class DocumentService {
         
         User owner = userService.getUserById(userId);
         
-        DocumentFolder folder = null;
-        if (request != null && request.getFolderId() != null) {
-            folder = folderRepository.findById(request.getFolderId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.FOLDER_NOT_FOUND, "文件夹不存在"));
-            if (!folder.getOwner().getId().equals(userId)) {
-                throw new BusinessException(ErrorCode.FORBIDDEN, "无权限操作此文件夹");
-            }
-        }
+        Long folderId = request != null ? request.getFolderId() : null;
+        DocumentFolder folder = resolveFolder(userId, folderId);
+        
+        // 创建物理存储目录并获取相对路径
+        String storagePath = fileStorageService.createDocumentStoragePath(userId, folder.getId());
         
         // 创建克隆文档
         Document clonedDocument = Document.builder()
@@ -319,8 +351,9 @@ public class DocumentService {
                 .visibility("private")
                 .tags(sourceDocument.getTags())
                 .folder(folder)
+                .storagePath(storagePath)
                 .forkedFrom(sourceDocument)
-                .status("active")
+                .status(STATUS_ACTIVE)
                 .build();
         
         clonedDocument = documentRepository.save(clonedDocument);
@@ -330,28 +363,73 @@ public class DocumentService {
         
         return DocumentDTO.fromEntity(clonedDocument, userId, true);
     }
+
+    /**
+     * 导入本地文件为文档
+     */
+    @Transactional
+    public DocumentDTO importDocument(Long userId, Long folderId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "上传文件为空");
+        }
+
+        String originalFilename = Objects.requireNonNullElse(file.getOriginalFilename(), "导入文档");
+        String extension = getFileExtension(originalFilename);
+        if (!isSupportedImportExtension(extension)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "仅支持导入 docx、md、markdown、txt 文件");
+        }
+
+        DocumentFolder folder = resolveFolder(userId, folderId);
+        String docType = determineDocumentType(extension);
+
+        String content;
+        try {
+            content = extractContentFromFile(file, extension);
+        } catch (IOException e) {
+            log.error("导入文件读取失败: {}", originalFilename, e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "读取文件失败");
+        }
+
+        String title = sanitizeFileName(stripExtension(originalFilename, extension));
+        if (title.isEmpty()) {
+            title = "导入文档";
+        }
+
+        String storagePath = fileStorageService.createDocumentStoragePath(userId, folder.getId());
+        String storedFileName = sanitizeFileName(originalFilename);
+        fileStorageService.saveFile(storagePath, storedFileName, file);
+
+        User owner = userService.getUserById(userId);
+        Document document = Document.builder()
+                .title(title)
+                .owner(owner)
+                .content(content)
+                .docType(docType)
+                .visibility("private")
+                .folder(folder)
+                .storagePath(storagePath)
+                .status(STATUS_ACTIVE)
+                .build();
+        
+        document = documentRepository.save(document);
+        createInitialVersion(document, owner);
+        
+        return DocumentDTO.fromEntity(document, userId, true);
+    }
     
     /**
      * 移动文档
      */
     @Transactional
     public DocumentDTO moveDocument(Long documentId, Long userId, MoveDocumentRequest request) {
-        Document document = getDocumentById(documentId);
+        Document document = getActiveDocument(documentId);
         
         // 检查编辑权限
         if (!checkDocumentEditPermission(document, userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权移动此文档");
         }
         
-        DocumentFolder targetFolder = null;
-        if (request.getTargetFolderId() != null) {
-            targetFolder = folderRepository.findById(request.getTargetFolderId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.FOLDER_NOT_FOUND, "目标文件夹不存在"));
-            // 检查目标文件夹是否属于文档所有者
-            if (!targetFolder.getOwner().getId().equals(document.getOwner().getId())) {
-                throw new BusinessException(ErrorCode.FORBIDDEN, "不能移动到其他用户的文件夹");
-            }
-        }
+        DocumentFolder targetFolder = resolveFolder(document.getOwner().getId(), request.getTargetFolderId());
         
         document.setFolder(targetFolder);
         document = documentRepository.save(document);
@@ -360,12 +438,71 @@ public class DocumentService {
     }
     
     // 辅助方法
-    
-    private Document getDocumentById(Long documentId) {
+
+    private Document getDocumentEntity(Long documentId) {
         return documentRepository.findById(documentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在"));
     }
-    
+
+    private Document getActiveDocument(Long documentId) {
+        Document document = getDocumentEntity(documentId);
+        if (isDeletedDocument(document) || isFolderDeleted(document.getFolder())) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在或已被删除");
+        }
+        return document;
+    }
+
+    private boolean isDeletedDocument(Document document) {
+        return document == null || STATUS_DELETED.equalsIgnoreCase(document.getStatus()) || document.getFolder() == null;
+    }
+
+    private boolean isFolderDeleted(DocumentFolder folder) {
+        return folder == null || folder.getParent() == null;
+    }
+
+    private DocumentFolder resolveFolder(Long userId, Long folderId) {
+        if (folderId == null) {
+            return getRootFolder(userId);
+        }
+
+        DocumentFolder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FOLDER_NOT_FOUND, "文件夹不存在"));
+
+        if (!folder.getOwner().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权限操作此文件夹");
+        }
+
+        if (isFolderDeleted(folder)) {
+            throw new BusinessException(ErrorCode.FOLDER_NOT_FOUND, "文件夹不存在或已被删除");
+        }
+
+        return folder;
+    }
+
+    private DocumentFolder getRootFolder(Long userId) {
+        return folderRepository.findRootFolderByOwnerId(userId)
+                .orElseGet(() -> recreateRootFolder(userId));
+    }
+
+    private DocumentFolder recreateRootFolder(Long userId) {
+        List<DocumentFolder> legacyRoots = folderRepository.findByOwnerIdAndParentIsNull(userId);
+        if (!legacyRoots.isEmpty()) {
+            DocumentFolder root = legacyRoots.get(0);
+            root.setParent(root);
+            return folderRepository.save(root);
+        }
+
+        User owner = userService.getUserById(userId);
+        DocumentFolder root = DocumentFolder.builder()
+                .owner(owner)
+                .name("根目录")
+                .parent(null)
+                .build();
+        root = folderRepository.save(root);
+        root.setParent(root);
+        return folderRepository.save(root);
+    }
+
     private void createInitialVersion(Document document, User user) {
         DocumentVersion initialVersion = DocumentVersion.builder()
                 .document(document)
@@ -376,11 +513,67 @@ public class DocumentService {
                 .build();
         versionRepository.save(initialVersion);
     }
-    
+
+    private String sanitizeFileName(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return "document";
+        }
+        return fileName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    }
+
+    private String stripExtension(String filename, String extension) {
+        String suffix = "." + extension.toLowerCase();
+        if (filename.toLowerCase().endsWith(suffix)) {
+            return filename.substring(0, filename.length() - suffix.length());
+        }
+        return filename;
+    }
+
+    private String getFileExtension(String filename) {
+        if (filename == null || !filename.contains(".")) {
+            return "";
+        }
+        return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+    }
+
+    private boolean isSupportedImportExtension(String extension) {
+        return "docx".equals(extension) || "md".equals(extension) || "markdown".equals(extension) || "txt".equals(extension);
+    }
+
+    private String determineDocumentType(String extension) {
+        return switch (extension) {
+            case "docx" -> "docx";
+            case "md", "markdown" -> "markdown";
+            default -> "txt";
+        };
+    }
+
+    private String extractContentFromFile(MultipartFile file, String extension) throws IOException {
+        return switch (extension) {
+            case "docx" -> extractDocxText(file);
+            case "md", "markdown", "txt" -> new String(file.getBytes(), StandardCharsets.UTF_8);
+            default -> new String(file.getBytes(), StandardCharsets.UTF_8);
+        };
+    }
+
+    private String extractDocxText(MultipartFile file) throws IOException {
+        try (XWPFDocument docx = new XWPFDocument(file.getInputStream())) {
+            StringBuilder sb = new StringBuilder();
+            for (XWPFParagraph paragraph : docx.getParagraphs()) {
+                sb.append(paragraph.getText()).append("\n");
+            }
+            return sb.toString().trim();
+        }
+    }
+
     /**
      * 检查用户是否有文档访问权限
      */
     public boolean checkDocumentAccess(Document document, Long userId) {
+        if (isDeletedDocument(document) || isFolderDeleted(document.getFolder())) {
+            return false;
+        }
+
         // 所有者可访问
         if (document.getOwner().getId().equals(userId)) {
             return true;
@@ -397,6 +590,9 @@ public class DocumentService {
      * 检查用户是否有文档编辑权限
      */
     public boolean checkDocumentEditPermission(Document document, Long userId) {
+        if (isDeletedDocument(document) || isFolderDeleted(document.getFolder())) {
+            return false;
+        }
         // 所有者可编辑
         if (document.getOwner().getId().equals(userId)) {
             return true;

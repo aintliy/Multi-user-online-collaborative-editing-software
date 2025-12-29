@@ -1,15 +1,8 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.auth.*;
-import com.example.backend.entity.User;
-import com.example.backend.exception.BusinessException;
-import com.example.backend.exception.ErrorCode;
-import com.example.backend.repository.UserRepository;
-import com.example.backend.security.JwtUtil;
-import com.example.backend.util.IdGenerator;
-import com.example.backend.util.RateLimiter;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -21,7 +14,24 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.TimeUnit;
+import com.example.backend.dto.auth.LoginRequest;
+import com.example.backend.dto.auth.LoginResponse;
+import com.example.backend.dto.auth.RegisterRequest;
+import com.example.backend.dto.auth.ResetPasswordRequest;
+import com.example.backend.dto.auth.UpdateProfileRequest;
+import com.example.backend.dto.auth.UserDTO;
+import com.example.backend.entity.DocumentFolder;
+import com.example.backend.entity.User;
+import com.example.backend.exception.BusinessException;
+import com.example.backend.exception.ErrorCode;
+import com.example.backend.repository.DocumentFolderRepository;
+import com.example.backend.repository.UserRepository;
+import com.example.backend.security.JwtUtil;
+import com.example.backend.util.IdGenerator;
+import com.example.backend.util.RateLimiter;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 认证服务
@@ -32,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 public class AuthService {
     
     private final UserRepository userRepository;
+    private final DocumentFolderRepository folderRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
@@ -42,7 +53,10 @@ public class AuthService {
     private static final String VERIFICATION_CODE_PREFIX = "reg_code:";
     private static final String PASSWORD_RESET_PREFIX = "pwd_reset:";
     private static final int VERIFICATION_CODE_EXPIRE = 300; // 5分钟
-    private static final int PASSWORD_RESET_EXPIRE = 3600; // 1小时
+    private static final int PASSWORD_RESET_EXPIRE = 300; // 5分钟
+
+    @Value("${spring.mail.username}")
+    private String from;
     
     /**
      * 发送注册验证码
@@ -110,6 +124,17 @@ public class AuthService {
                 .build();
         
         user = userRepository.save(user);
+        
+        // 创建用户的根文件夹
+        DocumentFolder rootFolder = DocumentFolder.builder()
+            .owner(user)
+            .name("根目录")
+            .parent(null)
+            .build();
+        rootFolder = folderRepository.save(rootFolder);
+        // 将根目录的父节点指向自身，便于后续识别根目录并与逻辑删除区分
+        rootFolder.setParent(rootFolder);
+        folderRepository.save(rootFolder);
         
         // 删除验证码
         stringRedisTemplate.delete(VERIFICATION_CODE_PREFIX + request.getEmail());
@@ -243,6 +268,7 @@ public class AuthService {
     
     private void sendEmail(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(text);

@@ -63,7 +63,7 @@ public class Document {
     private String tags;
     
     /**
-     * 所属文件夹ID（可选，NULL表示仓库根目录）
+     * 所属文件夹ID
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "folder_id")
@@ -75,6 +75,12 @@ public class Document {
     @Column(length = 20)
     @Builder.Default
     private String status = "active";
+    
+    /**
+     * 物理文件存储相对路径，格式: {ownerId}/{folderId}/
+     */
+    @Column(name = "storage_path", length = 512)
+    private String storagePath;
     
     /**
      * 若为克隆副本，则指向原始文档ID
