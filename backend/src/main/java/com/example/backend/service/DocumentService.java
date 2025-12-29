@@ -178,7 +178,7 @@ public class DocumentService {
 
         if (isAdmin) {
             if (document.getStoragePath() != null) {
-                fileStorageService.deleteDocumentStorage(document.getStoragePath());
+                fileStorageService.deleteFile(document.getStoragePath());
             }
             documentRepository.delete(document);
             return;
