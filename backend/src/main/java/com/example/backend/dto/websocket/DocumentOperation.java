@@ -28,6 +28,11 @@ public class DocumentOperation {
      * 插入/替换的文本
      */
     private String text;
+
+    /**
+     * 全量内容（兼容前端 replace 行为）
+     */
+    private String content;
     
     /**
      * 删除的字符数

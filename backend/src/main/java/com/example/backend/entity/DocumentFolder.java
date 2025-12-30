@@ -46,6 +46,9 @@ public class DocumentFolder {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")
     private DocumentFolder parent;
+
+    @Column(nullable = false, length = 20)
+    private String status;
     
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -54,4 +57,5 @@ public class DocumentFolder {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
 }

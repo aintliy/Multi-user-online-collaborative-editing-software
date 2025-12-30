@@ -40,7 +40,8 @@ public class FolderService {
     public List<FolderDTO> getFolderTree(Long userId) {
         DocumentFolder root = getOrCreateRootFolder(userId);
         List<DocumentFolder> allFolders = folderRepository.findByOwnerId(userId).stream()
-            // 过滤掉已逻辑删除的文件夹（parent 为空）
+            // 过滤掉已逻辑删除的文件夹
+            .filter(f -> !isDeletedFolder(f))
             .filter(f -> f.getParent() != null)
             .collect(Collectors.toList());
 
@@ -96,7 +97,9 @@ public class FolderService {
         List<DocumentFolder> legacyRoots = folderRepository.findByOwnerIdAndParentIsNull(userId);
         if (!legacyRoots.isEmpty()) {
             DocumentFolder root = legacyRoots.get(0);
-            root.setParent(root);
+            if (root.getStatus() == null) {
+                root.setStatus("active");
+            }
             return folderRepository.save(root);
         }
 
@@ -105,18 +108,17 @@ public class FolderService {
                 .owner(owner)
                 .name("根目录")
                 .parent(null)
+                .status("active")
                 .build();
-        root = folderRepository.save(root);
-        root.setParent(root);
         return folderRepository.save(root);
     }
 
     private boolean isRootFolder(DocumentFolder folder) {
-        return folder.getParent() != null && folder.getParent().getId().equals(folder.getId());
+        return folder.getParent() == null && "根目录".equals(folder.getName());
     }
 
     private boolean isDeletedFolder(DocumentFolder folder) {
-        return folder.getParent() == null;
+        return "deleted".equalsIgnoreCase(folder.getStatus());
     }
 
     private List<DocumentFolder> collectFolderSubtree(DocumentFolder folder) {
@@ -141,6 +143,7 @@ public class FolderService {
         for (DocumentFolder current : subtree) {
             markDocumentsDeleted(current.getId());
             current.setParent(null);
+            current.setStatus("deleted");
         }
 
         folderRepository.saveAll(subtree);
@@ -196,7 +199,8 @@ public class FolderService {
         DocumentFolder folder = DocumentFolder.builder()
                 .owner(owner)
                 .name(request.getName())
-                .parent(parent)
+            .parent(parent)
+            .status("active")
                 .build();
         
         folder = folderRepository.save(folder);

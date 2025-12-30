@@ -57,6 +57,9 @@ class WebSocketService {
 
     this.documentId = documentId;
 
+    this.unsubscribe('online-users');
+    this.unsubscribe('notifications');
+
     // 订阅文档频道
     const subscription = this.client.subscribe(
       `/topic/document/${documentId}`,
@@ -66,6 +69,19 @@ class WebSocketService {
       }
     );
     this.subscriptions.set(`document-${documentId}`, subscription);
+
+    // 订阅个人队列（在线列表/拒绝消息）
+    const onlineSub = this.client.subscribe('/user/queue/online-users', (message: IMessage) => {
+      const data: WebSocketMessage = JSON.parse(message.body);
+      this.handleMessage(data);
+    });
+    this.subscriptions.set('online-users', onlineSub);
+
+    const noticeSub = this.client.subscribe('/user/queue/notifications', (message: IMessage) => {
+      const data: WebSocketMessage = JSON.parse(message.body);
+      this.handleMessage(data);
+    });
+    this.subscriptions.set('notifications', noticeSub);
 
     // 发送加入消息
     this.client.publish({
@@ -84,23 +100,36 @@ class WebSocketService {
     });
 
     // 取消订阅
-    const subscription = this.subscriptions.get(`document-${this.documentId}`);
-    if (subscription) {
-      subscription.unsubscribe();
-      this.subscriptions.delete(`document-${this.documentId}`);
-    }
+    this.unsubscribe(`document-${this.documentId}`);
+    this.unsubscribe('online-users');
+    this.unsubscribe('notifications');
 
     this.documentId = null;
   }
 
   sendEdit(operation: DocumentOperation): void {
+    this.sendDraftEdit(operation.content ?? '');
+  }
+
+  sendDraftEdit(content: string): void {
     if (!this.client || !this.client.connected || !this.documentId) {
       return;
     }
 
     this.client.publish({
-      destination: `/app/document/${this.documentId}/edit`,
-      body: JSON.stringify(operation),
+      destination: `/app/document/${this.documentId}/draft`,
+      body: JSON.stringify({ type: 'replace', content }),
+    });
+  }
+
+  sendSaveConfirmed(content: string): void {
+    if (!this.client || !this.client.connected || !this.documentId) {
+      return;
+    }
+
+    this.client.publish({
+      destination: `/app/document/${this.documentId}/save`,
+      body: JSON.stringify({ type: 'replace', content }),
     });
   }
 
@@ -147,11 +176,20 @@ class WebSocketService {
     }
   }
 
+  private unsubscribe(key: string): void {
+    const subscription = this.subscriptions.get(key);
+    if (subscription) {
+      subscription.unsubscribe();
+      this.subscriptions.delete(key);
+    }
+  }
+
   subscribeToNotifications(_userId: number, handler: (message: any) => void): void {
     if (!this.client || !this.client.connected) {
       return;
     }
 
+    this.unsubscribe('notifications');
     const subscription = this.client.subscribe(
       `/user/queue/notifications`,
       (message: IMessage) => {

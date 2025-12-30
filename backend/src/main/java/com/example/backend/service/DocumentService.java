@@ -4,10 +4,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,10 +15,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.example.backend.dto.PageResponse;
 import com.example.backend.dto.document.CloneDocumentRequest;
 import com.example.backend.dto.document.CommitDocumentRequest;
+import com.example.backend.dto.document.DocumentCacheResponse;
 import com.example.backend.dto.document.CreateDocumentRequest;
 import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.dto.document.DocumentVersionDTO;
@@ -34,6 +36,7 @@ import com.example.backend.repository.DocumentCollaboratorRepository;
 import com.example.backend.repository.DocumentFolderRepository;
 import com.example.backend.repository.DocumentRepository;
 import com.example.backend.repository.DocumentVersionRepository;
+import com.example.backend.dto.websocket.WebSocketMessage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +58,8 @@ public class DocumentService {
     private final DocumentCollaboratorRepository collaboratorRepository;
     private final UserService userService;
     private final FileStorageService fileStorageService;
+    private final CollaborationCacheService collaborationCacheService;
+    private final SimpMessagingTemplate messagingTemplate;
     
     /**
      * 创建文档
@@ -70,7 +75,7 @@ public class DocumentService {
         Document document = Document.builder()
                 .title(request.getTitle())
                 .owner(owner)
-                .docType(request.getType() != null ? request.getType() : "markdown")
+            .docType(normalizeDocType(request.getDocType()))
                 .visibility(request.getVisibility() != null ? request.getVisibility() : "private")
                 .folder(folder)
                 .content("")
@@ -162,6 +167,77 @@ public class DocumentService {
         documentRepository.save(document);
         
         return DocumentVersionDTO.fromEntity(version);
+    }
+
+    /**
+     * 保存至 Redis 确认态并广播。
+     */
+    public void saveDocumentCache(Long documentId, Long userId, String username, String content) {
+        getEditableDocument(documentId, userId);
+
+        String lockToken = UUID.randomUUID().toString();
+        boolean locked = collaborationCacheService.acquireSaveLock(documentId, lockToken);
+        if (!locked) {
+            throw new BusinessException(ErrorCode.TOO_MANY_REQUESTS, "有人正在保存，请稍后重试");
+        }
+
+        try {
+            collaborationCacheService.saveConfirmed(documentId, content);
+            collaborationCacheService.clearDraft(documentId, userId);
+
+            WebSocketMessage message = WebSocketMessage.builder()
+                    .type("SAVE_CONFIRMED")
+                    .documentId(documentId)
+                    .userId(userId)
+                    .nickname(username)
+                    .data(Map.of("content", content))
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+
+            messagingTemplate.convertAndSend("/topic/document/" + documentId, message);
+        } finally {
+            collaborationCacheService.releaseSaveLock(documentId, lockToken);
+        }
+    }
+
+    /**
+     * 使用 Redis confirmed 内容提交版本（保持现有提交语义）。
+     */
+    @Transactional
+    public DocumentVersionDTO commitDocumentFromCache(Long documentId, Long userId, String commitMessage) {
+        Document document = getEditableDocument(documentId, userId);
+        String cached = collaborationCacheService.getConfirmed(documentId);
+        String content = cached != null ? cached : (document.getContent() == null ? "" : document.getContent());
+
+        CommitDocumentRequest request = new CommitDocumentRequest();
+        request.setContent(content);
+        request.setCommitMessage(commitMessage);
+
+        DocumentVersionDTO version = commitDocument(documentId, userId, request);
+        collaborationCacheService.clearContentCaches(documentId);
+        return version;
+    }
+
+    /**
+     * 获取协作缓存状态（确认态 + 当前用户草稿 + 在线列表）。
+     */
+    public DocumentCacheResponse getDocumentCache(Long documentId, Long userId) {
+        Document document = getActiveDocument(documentId);
+        if (!checkDocumentAccess(document, userId)) {
+            throw new BusinessException(ErrorCode.DOCUMENT_ACCESS_DENIED, "无权访问此文档");
+        }
+
+        String confirmed = collaborationCacheService.getConfirmed(documentId);
+        if (confirmed == null) {
+            confirmed = document.getContent() == null ? "" : document.getContent();
+            collaborationCacheService.saveConfirmed(documentId, confirmed);
+        }
+
+        return DocumentCacheResponse.builder()
+                .confirmedContent(confirmed)
+                .userDraftContent(collaborationCacheService.getDraft(documentId, userId))
+                .onlineUsers(collaborationCacheService.getOnlineUsers(documentId))
+                .build();
     }
     
     /**
@@ -347,7 +423,7 @@ public class DocumentService {
                 .title(sourceDocument.getTitle() + " (克隆)")
                 .owner(owner)
                 .content(sourceDocument.getContent())
-                .docType(sourceDocument.getDocType())
+            .docType(normalizeDocType(sourceDocument.getDocType()))
                 .visibility("private")
                 .tags(sourceDocument.getTags())
                 .folder(folder)
@@ -376,7 +452,7 @@ public class DocumentService {
         String originalFilename = Objects.requireNonNullElse(file.getOriginalFilename(), "导入文档");
         String extension = getFileExtension(originalFilename);
         if (!isSupportedImportExtension(extension)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "仅支持导入 docx、md、markdown、txt 文件");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "仅支持导入 markdown(md) 或 txt 文件");
         }
 
         DocumentFolder folder = resolveFolder(userId, folderId);
@@ -439,6 +515,17 @@ public class DocumentService {
     
     // 辅助方法
 
+    /**
+     * 校验编辑权限并返回文档实体。
+     */
+    public Document getEditableDocument(Long documentId, Long userId) {
+        Document document = getActiveDocument(documentId);
+        if (!checkDocumentEditPermission(document, userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权编辑此文档");
+        }
+        return document;
+    }
+
     private Document getDocumentEntity(Long documentId) {
         return documentRepository.findById(documentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在"));
@@ -457,7 +544,7 @@ public class DocumentService {
     }
 
     private boolean isFolderDeleted(DocumentFolder folder) {
-        return folder == null || folder.getParent() == null;
+        return folder == null || "deleted".equalsIgnoreCase(folder.getStatus());
     }
 
     private DocumentFolder resolveFolder(Long userId, Long folderId) {
@@ -488,7 +575,9 @@ public class DocumentService {
         List<DocumentFolder> legacyRoots = folderRepository.findByOwnerIdAndParentIsNull(userId);
         if (!legacyRoots.isEmpty()) {
             DocumentFolder root = legacyRoots.get(0);
-            root.setParent(root);
+            if (root.getStatus() == null) {
+                root.setStatus("active");
+            }
             return folderRepository.save(root);
         }
 
@@ -497,9 +586,8 @@ public class DocumentService {
                 .owner(owner)
                 .name("根目录")
                 .parent(null)
+                .status("active")
                 .build();
-        root = folderRepository.save(root);
-        root.setParent(root);
         return folderRepository.save(root);
     }
 
@@ -537,33 +625,35 @@ public class DocumentService {
     }
 
     private boolean isSupportedImportExtension(String extension) {
-        return "docx".equals(extension) || "md".equals(extension) || "markdown".equals(extension) || "txt".equals(extension);
+        return "md".equals(extension) || "markdown".equals(extension) || "txt".equals(extension);
     }
 
     private String determineDocumentType(String extension) {
         return switch (extension) {
-            case "docx" -> "docx";
             case "md", "markdown" -> "markdown";
-            default -> "txt";
+            case "txt" -> "txt";
+            default -> throw new BusinessException(ErrorCode.PARAM_ERROR, "仅支持导入 markdown(md) 或 txt 文件");
         };
     }
 
     private String extractContentFromFile(MultipartFile file, String extension) throws IOException {
         return switch (extension) {
-            case "docx" -> extractDocxText(file);
             case "md", "markdown", "txt" -> new String(file.getBytes(), StandardCharsets.UTF_8);
-            default -> new String(file.getBytes(), StandardCharsets.UTF_8);
+            default -> throw new BusinessException(ErrorCode.PARAM_ERROR, "仅支持导入 markdown(md) 或 txt 文件");
         };
     }
 
-    private String extractDocxText(MultipartFile file) throws IOException {
-        try (XWPFDocument docx = new XWPFDocument(file.getInputStream())) {
-            StringBuilder sb = new StringBuilder();
-            for (XWPFParagraph paragraph : docx.getParagraphs()) {
-                sb.append(paragraph.getText()).append("\n");
-            }
-            return sb.toString().trim();
+    private String normalizeDocType(String docType) {
+        if (docType == null || docType.isEmpty()) {
+            return "markdown";
         }
+        String lowered = docType.toLowerCase();
+        return switch (lowered) {
+            case "md", "markdown" -> "markdown";
+            case "txt", "text", "plaintext" -> "txt";
+            case "docx" -> "markdown"; // 旧数据降级为 markdown
+            default -> throw new BusinessException(ErrorCode.PARAM_ERROR, "文档类型仅支持 markdown 或 txt");
+        };
     }
 
     /**

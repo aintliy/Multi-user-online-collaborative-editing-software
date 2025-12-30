@@ -5,6 +5,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   Document,
+  DocumentCacheResponse,
   CreateDocumentRequest,
   DocumentVersion,
   Folder,
@@ -77,6 +78,14 @@ export const documentApi = {
   // 获取文档详情
   getById: (id: number) =>
     get<Document>(`/documents/${id}`),
+
+  // 获取协作缓存态
+  getCache: (id: number) =>
+    get<DocumentCacheResponse>(`/documents/${id}/cache`),
+
+  // 保存确认态到 Redis
+  saveCache: (id: number, data: { content: string }) =>
+    post<void>(`/documents/${id}/cache/save`, data),
   
   // 更新文档
   update: (id: number, data: Partial<CreateDocumentRequest>) =>
@@ -100,6 +109,10 @@ export const documentApi = {
   // 提交文档版本
   commit: (id: number, data: { content: string; commitMessage: string }) =>
     post<DocumentVersion>(`/documents/${id}/commits`, data),
+
+  // 从缓存提交版本
+  commitFromCache: (id: number, data: { commitMessage: string }) =>
+    post<DocumentVersion>(`/documents/${id}/commits/from-cache`, data),
   
   // 获取版本列表
   getVersions: (id: number, params?: { page?: number; pageSize?: number }) =>
@@ -134,7 +147,6 @@ export const documentApi = {
     put<Document>(`/documents/${id}/move`, { folderId }),
   
   // 导出文档
-  exportWord: (id: number) => `/documents/${id}/export/word`,
   exportPdf: (id: number) => `/documents/${id}/export/pdf`,
   exportTxt: (id: number) => `/documents/${id}/export/txt`,
   exportMd: (id: number) => `/documents/${id}/export/md`,

@@ -34,24 +34,6 @@ public class DocumentExportController {
     private final UserService userService;
     
     /**
-     * 导出文档为Word格式
-     */
-    @GetMapping("/{id}/export/word")
-    public ApiResponse<ResponseEntity<byte[]>> exportToWord(@AuthenticationPrincipal UserDetails userDetails,
-                                                @PathVariable Long id) throws Exception {
-        User user = userService.getUserByEmail(userDetails.getUsername());
-        byte[] content = documentExportService.exportToWord(id, user.getId());
-        
-        String filename = URLEncoder.encode("document.docx", StandardCharsets.UTF_8);
-        return ApiResponse.success("导出成功",
-                ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-                .body(content)
-        );
-    }
-    
-    /**
      * 导出文档为PDF格式
      */
     @GetMapping("/{id}/export/pdf")

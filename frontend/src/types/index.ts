@@ -35,7 +35,7 @@ export interface Document {
   ownerId: number;
   owner?: User;
   visibility: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
-  docType: string;
+  docType: 'markdown' | 'txt';
   forkedFromId?: number;
   content?: string;
   tags?: string;
@@ -50,7 +50,7 @@ export interface Document {
 
 export interface CreateDocumentRequest {
   title: string;
-  docType?: string;
+  docType?: 'markdown' | 'txt';
   visibility?: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
   folderId?: number;
   tags?: string;
@@ -65,6 +65,12 @@ export interface DocumentVersion {
   commitMessage?: string;
   createdBy?: User;
   createdAt: string;
+}
+
+export interface DocumentCacheResponse {
+  confirmedContent?: string;
+  userDraftContent?: string;
+  onlineUsers?: number[];
 }
 
 // 文件夹相关类型
@@ -171,14 +177,18 @@ export interface PageResponse<T> {
 // WebSocket消息类型
 export interface WebSocketMessage {
   type: string;
-  payload: any;
+  data: any;
+  documentId?: number;
+  userId?: number;
+  nickname?: string;
   timestamp?: number;
 }
 
 export interface CursorPosition {
   userId: number;
-  line: number;
-  column: number;
+  line?: number;
+  column?: number;
+  position?: number;
 }
 
 export interface DocumentOperation {
@@ -186,4 +196,5 @@ export interface DocumentOperation {
   content?: string;
   position?: number;
   length?: number;
+  text?: string;
 }

@@ -36,7 +36,7 @@ public class FileStorageService {
      * 
      * @param ownerId 文档所有者ID
      * @param folderId 文档所属文件夹ID，null表示用户根目录
-     * @return 相对存储路径，格式: {ownerId}/{folderId}/ 或 {ownerId}/root/
+     * @return 相对存储路径，格式: {ownerId}/{folderId}/
      */
     public String createDocumentStoragePath(Long ownerId, Long folderId) {
         try {
@@ -58,12 +58,12 @@ public class FileStorageService {
      * 构建相对存储路径
      * 
      * @param ownerId 所有者ID
-     * @param folderId 文件夹ID
+     * @param folderId 文件夹ID，null表示根目录
      * @return 相对路径，格式: {ownerId}/{folderId}/
      */
     private String buildRelativePath(Long ownerId, Long folderId) {
         if (folderId == null) {
-            return ownerId + "/root/";
+            return ownerId.toString() + "/";
         }
         return ownerId + "/" + folderId + "/";
     }

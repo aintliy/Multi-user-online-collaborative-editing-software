@@ -43,7 +43,7 @@ public class Document {
     private String content;
     
     /**
-     * 文档类型: markdown / docx / txt / sheet / slide
+     * 文档类型: markdown / txt
      */
     @Column(name = "doc_type", length = 20)
     @Builder.Default

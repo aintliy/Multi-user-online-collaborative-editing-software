@@ -131,9 +131,7 @@ public class AuthService {
             .name("根目录")
             .parent(null)
             .build();
-        rootFolder = folderRepository.save(rootFolder);
-        // 将根目录的父节点指向自身，便于后续识别根目录并与逻辑删除区分
-        rootFolder.setParent(rootFolder);
+
         folderRepository.save(rootFolder);
         
         // 删除验证码

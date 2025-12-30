@@ -33,6 +33,16 @@ public class CursorPosition {
      * 光标位置
      */
     private Integer position;
+
+    /**
+     * 行号（兼容前端编辑器光标结构）
+     */
+    private Integer line;
+
+    /**
+     * 列号（兼容前端编辑器光标结构）
+     */
+    private Integer column;
     
     /**
      * 选区起始位置

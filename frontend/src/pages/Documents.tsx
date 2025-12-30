@@ -97,6 +97,11 @@ const Documents: React.FC = () => {
 
   const handleImportDocument = async (file: File) => {
     try {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!ext || !['md', 'markdown', 'txt'].includes(ext)) {
+        message.error('仅支持导入 Markdown(.md) 或 TXT 文件');
+        return;
+      }
       const doc = await documentApi.import(file, selectedFolderId);
       message.success('导入成功');
       fetchDocuments();
@@ -474,6 +479,7 @@ const Documents: React.FC = () => {
                       <div className="document-title">
                         <FileTextOutlined className="document-icon" />
                         <span>{doc.title}</span>
+                        <Tag color="cyan">{doc.docType?.toUpperCase() || 'MARKDOWN'}</Tag>
                         {doc.visibility.toLowerCase() === 'private' ? (
                           <Tag icon={<LockOutlined />} color="default">私有</Tag>
                         ) : (
@@ -524,6 +530,12 @@ const Documents: React.FC = () => {
             rules={[{ required: true, message: '请输入文档标题' }]}
           >
             <Input placeholder="请输入文档标题" />
+          </Form.Item>
+          <Form.Item name="docType" label="文档类型" initialValue="markdown">
+            <Select>
+              <Select.Option value="markdown">Markdown</Select.Option>
+              <Select.Option value="txt">纯文本 (TXT)</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item name="visibility" label="可见性" initialValue="private">
             <Select>

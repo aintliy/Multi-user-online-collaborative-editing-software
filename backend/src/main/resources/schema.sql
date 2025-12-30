@@ -5,6 +5,20 @@
 -- 数据库: PostgreSQL
 -- =====================================================
 
+DROP TABLE IF EXISTS operation_logs CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS chat_messages CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
+DROP TABLE IF EXISTS user_friends CASCADE;
+DROP TABLE IF EXISTS document_invite_links CASCADE;
+DROP TABLE IF EXISTS document_workspace_requests CASCADE;
+DROP TABLE IF EXISTS document_collaborators CASCADE;
+DROP TABLE IF EXISTS document_versions CASCADE;
+DROP TABLE IF EXISTS documents CASCADE;
+DROP TABLE IF EXISTS document_folders CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- =====================================================
 -- 1. 用户表 (users)
 -- =====================================================
@@ -40,6 +54,7 @@ CREATE TABLE document_folders (
   owner_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name         VARCHAR(255) NOT NULL,
   parent_id    BIGINT REFERENCES document_folders(id) ON DELETE CASCADE,
+  status       VARCHAR(20) DEFAULT 'active',
   created_at   TIMESTAMP DEFAULT NOW(),
   updated_at   TIMESTAMP DEFAULT NOW(),
   CONSTRAINT uq_folder_name_per_parent UNIQUE (owner_id, parent_id, name)

@@ -41,12 +41,22 @@ import './DocumentEdit.scss';
 const { Header, Sider, Content } = Layout;
 const { TextArea } = Input;
 
+// 映射文档类型到编辑器语言
+const getEditorLanguage = (docType: string): string => {
+  const languageMap: Record<string, string> = {
+    markdown: 'markdown',
+    txt: 'plaintext',
+  };
+  return languageMap[docType] || 'markdown';
+};
+
 const DocumentEdit: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, token } = useAuthStore();
-  const { content, setContent, setCurrentDocument, onlineUsers, addOnlineUser, removeOnlineUser, updateCursor, clearOnlineData } = useDocumentStore();
+  const { content, setContent, setCurrentDocument, onlineUsers, addOnlineUser, removeOnlineUser, updateCursor, clearOnlineData, setOnlineUsers, setDirty } = useDocumentStore();
   const editorRef = useRef<any>(null);
+  const applyingRemoteRef = useRef(false);
   
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,29 +107,61 @@ const DocumentEdit: React.FC = () => {
   }, [document, token]);
 
   const setupWebSocketHandlers = () => {
-    wsService.onMessage('USER_JOINED', (msg) => {
-      addOnlineUser(msg.payload.user);
-      message.info(`${msg.payload.user.username} 加入了协作`);
+    wsService.onMessage('JOIN', (msg) => {
+      if (msg.data?.onlineUserSummaries) {
+        setOnlineUsers(msg.data.onlineUserSummaries);
+      }
+      if (msg.data?.user) {
+        addOnlineUser(msg.data.user);
+        message.info(`${msg.data.user.username} 加入了协作`);
+      }
     });
-    
-    wsService.onMessage('USER_LEFT', (msg) => {
-      removeOnlineUser(msg.payload.userId);
-    });
-    
-    wsService.onMessage('EDIT', (msg) => {
-      if (msg.payload.userId !== user?.id) {
-        handleRemoteEdit(msg.payload);
+
+    wsService.onMessage('ONLINE_USERS', (msg) => {
+      if (msg.data?.onlineUserSummaries) {
+        setOnlineUsers(msg.data.onlineUserSummaries);
       }
     });
     
+    wsService.onMessage('LEAVE', (msg) => {
+      const targetId = msg.data?.userId ?? msg.userId;
+      if (targetId) {
+        removeOnlineUser(targetId);
+      }
+    });
+    
+    wsService.onMessage('DRAFT_EDIT', (msg) => {
+      if (msg.userId !== user?.id && msg.data?.content) {
+        applyRemoteContent(msg.data.content, true);
+      }
+    });
+    
+    wsService.onMessage('SAVE_CONFIRMED', (msg) => {
+      if (msg.data?.content) {
+        applyRemoteContent(msg.data.content, false);
+        setIsDirty(false);
+        setDirty(false);
+        if (msg.userId === user?.id) {
+          message.success('已保存到协作缓存');
+        } else {
+          message.info(`${msg.nickname || '协作者'} 已保存内容`);
+        }
+      }
+    });
+
+    wsService.onMessage('SAVE_REJECTED', (msg) => {
+      message.warning(msg.data?.reason || '保存被拒绝，请稍后重试');
+    });
+    
     wsService.onMessage('CURSOR', (msg) => {
-      if (msg.payload.userId !== user?.id) {
-        updateCursor(msg.payload.userId, msg.payload);
+      const targetId = msg.userId ?? msg.data?.userId;
+      if (targetId && targetId !== user?.id) {
+        updateCursor(targetId, msg.data || {});
       }
     });
     
     wsService.onMessage('CHAT', (msg) => {
-      setChatMessages(prev => [...prev, msg.payload]);
+      setChatMessages(prev => [...prev, msg.data]);
     });
   };
 
@@ -130,8 +172,11 @@ const DocumentEdit: React.FC = () => {
       setDocument(doc);
       setCurrentDocument(doc);
       setContent(doc.content || '');
+      setDirty(false);
+      setIsDirty(false);
       
       // Fetch related data
+      fetchDocumentCache();
       fetchCollaborators();
       fetchComments();
       fetchTasks();
@@ -141,6 +186,18 @@ const DocumentEdit: React.FC = () => {
       navigate('/documents');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDocumentCache = async () => {
+    try {
+      const cache = await documentApi.getCache(documentId);
+      const nextContent = cache.userDraftContent ?? cache.confirmedContent ?? content;
+      if (nextContent !== undefined) {
+        applyRemoteContent(nextContent, false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch document cache:', error);
     }
   };
 
@@ -189,27 +246,35 @@ const DocumentEdit: React.FC = () => {
     }
   };
 
-  const handleRemoteEdit = (_operation: any) => {
-    // Apply remote edit to editor
-    // This is a simplified version - real OT would be more complex
-    if (editorRef.current) {
-      // Apply the operation to editor
-      // For now, just refresh the content from server
+  const applyRemoteContent = (value: string, markDirty: boolean) => {
+    applyingRemoteRef.current = true;
+
+    const model = editorRef.current?.getModel ? editorRef.current.getModel() : null;
+    if (model && typeof model.setValue === 'function') {
+      model.setValue(value);
+    } else if (editorRef.current && typeof editorRef.current.setValue === 'function') {
+      editorRef.current.setValue(value);
     }
+
+    setContent(value);
+    setDirty(markDirty);
+    setIsDirty(markDirty);
+    applyingRemoteRef.current = false;
   };
 
   const handleEditorChange = useCallback((value: string | undefined) => {
+    if (applyingRemoteRef.current) {
+      applyingRemoteRef.current = false;
+      return;
+    }
+
     if (value !== undefined) {
       setContent(value);
       setIsDirty(true);
-      
-      // Send edit to other users
-      wsService.sendEdit({
-        type: 'replace',
-        content: value,
-      });
+      setDirty(true);
+      wsService.sendDraftEdit(value);
     }
-  }, []);
+  }, [setDirty]);
 
   const handleEditorMount = (editor: any) => {
     editorRef.current = editor;
@@ -227,9 +292,10 @@ const DocumentEdit: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await documentApi.update(documentId, { content });
+      await documentApi.saveCache(documentId, { content });
       setIsDirty(false);
-      message.success('保存成功');
+      setDirty(false);
+      message.success('已保存到协作缓存');
     } catch (error: any) {
       message.error(error.response?.data?.message || '保存失败');
     } finally {
@@ -239,11 +305,12 @@ const DocumentEdit: React.FC = () => {
 
   const handleCommit = async (values: { commitMessage: string }) => {
     try {
-      await documentApi.commit(documentId, {
-        content,
+      await documentApi.commitFromCache(documentId, {
         commitMessage: values.commitMessage,
       });
       message.success('提交成功');
+      setIsDirty(false);
+      setDirty(false);
       setCommitModalOpen(false);
       form.resetFields();
       fetchVersions();
@@ -345,7 +412,6 @@ const DocumentEdit: React.FC = () => {
   };
 
   const exportMenuItems = [
-    { key: 'word', label: 'Word (.docx)', onClick: () => window.open(documentApi.exportWord(documentId)) },
     { key: 'pdf', label: 'PDF (.pdf)', onClick: () => window.open(documentApi.exportPdf(documentId)) },
     { key: 'txt', label: '文本 (.txt)', onClick: () => window.open(documentApi.exportTxt(documentId)) },
     { key: 'md', label: 'Markdown (.md)', onClick: () => window.open(documentApi.exportMd(documentId)) },
@@ -365,6 +431,7 @@ const DocumentEdit: React.FC = () => {
             onClick={() => navigate('/documents')}
           />
           <span className="doc-title">{document?.title}</span>
+          {document?.docType && <Tag color="cyan">{document.docType.toUpperCase()}</Tag>}
           {isDirty && <Tag color="orange">未保存</Tag>}
         </div>
         <div className="header-center">
@@ -417,7 +484,7 @@ const DocumentEdit: React.FC = () => {
         <Content className="edit-content">
           <Editor
             height="100%"
-            defaultLanguage="markdown"
+            language={document ? getEditorLanguage(document.docType) : 'markdown'}
             value={content}
             onChange={handleEditorChange}
             onMount={handleEditorMount}

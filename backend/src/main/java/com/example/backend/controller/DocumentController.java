@@ -17,12 +17,15 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.backend.dto.ApiResponse;
 import com.example.backend.dto.PageResponse;
+import com.example.backend.dto.document.CommitFromCacheRequest;
 import com.example.backend.dto.document.CloneDocumentRequest;
 import com.example.backend.dto.document.CommitDocumentRequest;
 import com.example.backend.dto.document.CreateDocumentRequest;
+import com.example.backend.dto.document.DocumentCacheResponse;
 import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.dto.document.DocumentVersionDTO;
 import com.example.backend.dto.document.MoveDocumentRequest;
+import com.example.backend.dto.document.SaveDocumentRequest;
 import com.example.backend.dto.document.UpdateDocumentRequest;
 import com.example.backend.entity.User;
 import com.example.backend.service.DocumentService;
@@ -41,6 +44,7 @@ public class DocumentController {
     
     private final DocumentService documentService;
     private final UserService userService;
+    // 仅做调度，具体实现放在 Service 层
     
     /**
      * 创建文档
@@ -75,6 +79,17 @@ public class DocumentController {
         DocumentDTO document = documentService.getDocument(id, user.getId());
         return ApiResponse.success(document);
     }
+
+    /**
+     * 获取协作缓存态（确认态内容、当前用户草稿、在线列表）
+     */
+    @GetMapping("/{id}/cache")
+    public ApiResponse<DocumentCacheResponse> getDocumentCache(@AuthenticationPrincipal UserDetails userDetails,
+                                                                @PathVariable Long id) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        DocumentCacheResponse cache = documentService.getDocumentCache(id, user.getId());
+        return ApiResponse.success(cache);
+    }
     
     /**
      * 更新文档元信息
@@ -86,6 +101,18 @@ public class DocumentController {
         User user = userService.getUserByEmail(userDetails.getUsername());
         DocumentDTO document = documentService.updateDocument(id, user.getId(), request);
         return ApiResponse.success("更新成功", document);
+    }
+
+    /**
+     * 保存至 Redis 确认态（不持久化数据库）。
+     */
+    @PostMapping("/{id}/cache/save")
+    public ApiResponse<Void> saveDocumentCache(@AuthenticationPrincipal UserDetails userDetails,
+                                               @PathVariable Long id,
+                                               @Valid @RequestBody SaveDocumentRequest request) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        documentService.saveDocumentCache(id, user.getId(), user.getUsername(), request.getContent());
+        return ApiResponse.success("保存成功");
     }
     
     /**
@@ -139,6 +166,18 @@ public class DocumentController {
                                                            @Valid @RequestBody CommitDocumentRequest request) {
         User user = userService.getUserByEmail(userDetails.getUsername());
         DocumentVersionDTO version = documentService.commitDocument(id, user.getId(), request);
+        return ApiResponse.success("提交成功", version);
+    }
+
+    /**
+     * 从 Redis 确认态提交版本
+     */
+    @PostMapping("/{id}/commits/from-cache")
+    public ApiResponse<DocumentVersionDTO> commitDocumentFromCache(@AuthenticationPrincipal UserDetails userDetails,
+                                                                    @PathVariable Long id,
+                                                                    @Valid @RequestBody CommitFromCacheRequest request) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        DocumentVersionDTO version = documentService.commitDocumentFromCache(id, user.getId(), request.getCommitMessage());
         return ApiResponse.success("提交成功", version);
     }
     

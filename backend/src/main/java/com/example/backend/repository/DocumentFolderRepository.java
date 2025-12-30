@@ -25,6 +25,6 @@ public interface DocumentFolderRepository extends JpaRepository<DocumentFolder, 
     
     boolean existsByOwnerIdAndParentIsNullAndName(Long ownerId, String name);
 
-    @Query("SELECT f FROM DocumentFolder f WHERE f.owner.id = :ownerId AND f.parent.id = f.id")
+    @Query("SELECT f FROM DocumentFolder f WHERE f.owner.id = :ownerId AND f.parent IS NULL AND f.status = 'active' AND f.name = '根目录'")
     Optional<DocumentFolder> findRootFolderByOwnerId(@Param("ownerId") Long ownerId);
 }

@@ -3,9 +3,6 @@ package com.example.backend.service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.springframework.stereotype.Service;
 
 import com.example.backend.entity.Document;
@@ -34,57 +31,13 @@ public class DocumentExportService {
     private final FileStorageService fileStorageService;
     
     /**
-     * 导出为Word文档
-     */
-    public byte[] exportToWord(Long documentId, Long userId) throws IOException {
-        Document document = getDocumentWithAccess(documentId, userId);
-        
-        try (XWPFDocument doc = new XWPFDocument();
-             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            
-            // 添加标题
-            XWPFParagraph titleParagraph = doc.createParagraph();
-            XWPFRun titleRun = titleParagraph.createRun();
-            titleRun.setText(document.getTitle());
-            titleRun.setBold(true);
-            titleRun.setFontSize(16);
-            
-            // 添加内容
-            if (document.getContent() != null && !document.getContent().isEmpty()) {
-                String[] paragraphs = document.getContent().split("\n");
-                for (String para : paragraphs) {
-                    XWPFParagraph paragraph = doc.createParagraph();
-                    XWPFRun run = paragraph.createRun();
-                    run.setText(para);
-                }
-            }
-            
-            doc.write(out);
-            byte[] exportedBytes = out.toByteArray();
-            
-            // 保存导出的文件到文档存储目录
-            if (document.getStoragePath() != null) {
-                try {
-                    String fileName = sanitizeFileName(document.getTitle()) + ".docx";
-                    fileStorageService.saveBytes(document.getStoragePath(), fileName, exportedBytes);
-                    log.debug("Word文件已保存到存储目录: {}", document.getStoragePath() + fileName);
-                } catch (Exception e) {
-                    log.warn("保存Word文件到存储目录失败", e);
-                    // 不影响导出流程
-                }
-            }
-            
-            return exportedBytes;
-        }
-    }
-    
-    /**
      * 导出为PDF文档
      */
     public byte[] exportToPdf(Long documentId, Long userId) throws DocumentException, IOException {
         Document document = getDocumentWithAccess(documentId, userId);
         
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            @SuppressWarnings("resource") // pdfDoc manually closed below
             com.lowagie.text.Document pdfDoc = new com.lowagie.text.Document();
             PdfWriter.getInstance(pdfDoc, out);
             

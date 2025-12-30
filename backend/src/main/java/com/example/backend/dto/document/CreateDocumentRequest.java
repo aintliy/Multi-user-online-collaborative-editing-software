@@ -13,9 +13,9 @@ public class CreateDocumentRequest {
     private String title;
     
     /**
-     * 文档类型: markdown / docx / txt / sheet / slide
+     * 文档类型: markdown / txt
      */
-    private String type = "markdown";
+    private String docType = "markdown";
     
     /**
      * 可见性: private / public
