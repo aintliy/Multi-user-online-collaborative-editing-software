@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Avatar, Form, Input, Button, Upload, message, Divider, Descriptions } from 'antd';
-import { UserOutlined, UploadOutlined, MailOutlined, IdcardOutlined } from '@ant-design/icons';
+import { UserOutlined, UploadOutlined, MailOutlined, IdcardOutlined, InboxOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useAuthStore } from '../store/useAuthStore';
 import { authApi, userApi } from '../api';
 import './Profile.scss';
+
+const { Dragger } = Upload;
 
 const Profile: React.FC = () => {
   const { user, updateUser } = useAuthStore();
@@ -36,13 +38,20 @@ const Profile: React.FC = () => {
 
   const uploadProps: UploadProps = {
     name: 'file',
-    showUploadList: false,
+    accept: 'image/*',
+    listType: 'picture',
+    maxCount: 1,
+    showUploadList: true,
     customRequest: async (options) => {
       const { file, onSuccess, onError } = options;
       setUploadLoading(true);
       try {
         const result = await userApi.uploadAvatar(file as File);
-        updateUser({ ...user!, avatarUrl: result.avatarUrl });
+        // 确保头像URL是完整的
+        const fullAvatarUrl = result.avatarUrl.startsWith('http') 
+          ? result.avatarUrl 
+          : `http://localhost:8080${result.avatarUrl}`;
+        updateUser({ ...user!, avatarUrl: fullAvatarUrl });
         message.success('头像上传成功');
         onSuccess?.(result);
       } catch (error: any) {
@@ -73,18 +82,16 @@ const Profile: React.FC = () => {
         <div className="avatar-section">
           <Avatar
             size={100}
-            src={user?.avatarUrl}
+            src={user?.avatarUrl ? (user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:8080${user.avatarUrl}`) : undefined}
             icon={<UserOutlined />}
           />
-          <Upload {...uploadProps}>
-            <Button
-              icon={<UploadOutlined />}
-              loading={uploadLoading}
-              style={{ marginTop: 16 }}
-            >
-              更换头像
-            </Button>
-          </Upload>
+          <Dragger {...uploadProps} style={{ marginTop: 16, maxWidth: 400 }}>
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">点击或拖拽图片到此区域上传</p>
+            <p className="ant-upload-hint">支持 JPG、PNG、GIF 格式，大小不超过 2MB</p>
+          </Dragger>
         </div>
 
         <Divider />

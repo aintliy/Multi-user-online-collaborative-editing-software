@@ -1,4 +1,4 @@
-import { get, post, put, del, upload } from '../utils/request';
+import request, { get, post, put, del, upload } from '../utils/request';
 import type {
   User,
   LoginRequest,
@@ -69,7 +69,10 @@ export const userApi = {
 export const documentApi = {
   // 创建文档
   create: (data: CreateDocumentRequest) =>
-    post<Document>('/documents', data),
+    post<Document>('/documents', {
+      ...data,
+      visibility: normalizeVisibility(data.visibility),
+    }),
   
   // 获取文档详情
   getById: (id: number) =>
@@ -77,7 +80,10 @@ export const documentApi = {
   
   // 更新文档
   update: (id: number, data: Partial<CreateDocumentRequest>) =>
-    put<Document>(`/documents/${id}`, data),
+    put<Document>(`/documents/${id}`, {
+      ...data,
+      visibility: normalizeVisibility(data.visibility),
+    }),
   
   // 删除文档
   delete: (id: number) =>
@@ -110,6 +116,18 @@ export const documentApi = {
   // 克隆文档
   clone: (id: number, data?: { title?: string; folderId?: number }) =>
     post<Document>(`/documents/${id}/clone`, data),
+
+  // 导入文档
+  import: (file: File, folderId?: number | null) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (folderId !== undefined && folderId !== null) {
+      formData.append('folderId', String(folderId));
+    }
+    return request.post('/documents/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(res => res.data.data as Document);
+  },
   
   // 移动文档
   move: (id: number, folderId: number | null) =>
@@ -297,3 +315,9 @@ export const adminApi = {
   getOperationLogs: (params?: { userId?: number; operationType?: string; page?: number; pageSize?: number }) =>
     get<PageResponse<any>>('/admin/operation-logs', { params }),
 };
+
+function normalizeVisibility(value?: string | null) {
+  if (!value) return value;
+  const lower = value.toLowerCase();
+  return lower === 'public' || lower === 'private' ? lower : value;
+}

@@ -76,11 +76,15 @@ const Documents: React.FC = () => {
     {
       title: '可见性',
       dataIndex: 'visibility',
-      render: (visibility: string) => (
-        <Tag color={visibility === 'PUBLIC' ? 'blue' : 'default'}>
-          {visibility === 'PUBLIC' ? '公开' : '私有'}
-        </Tag>
-      ),
+      render: (visibility: string) => {
+        const v = (visibility || '').toLowerCase();
+        const isPublic = v === 'public';
+        return (
+          <Tag color={isPublic ? 'blue' : 'default'}>
+            {isPublic ? '公开' : '私有'}
+          </Tag>
+        );
+      },
     },
     {
       title: '创建时间',

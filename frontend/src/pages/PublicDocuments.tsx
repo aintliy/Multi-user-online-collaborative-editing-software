@@ -97,7 +97,7 @@ const PublicDocuments: React.FC = () => {
           />
         </div>
 
-        {documents.length === 0 ? (
+        {!documents || documents.length === 0 ? (
           <Empty description="暂无公开文档" style={{ marginTop: 60 }} />
         ) : (
           <List

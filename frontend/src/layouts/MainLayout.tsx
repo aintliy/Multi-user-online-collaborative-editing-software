@@ -147,7 +147,10 @@ const MainLayout: React.FC = () => {
             <div className="header-actions">
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <Space className="user-info" style={{ cursor: 'pointer' }}>
-                  <Avatar src={user?.avatarUrl} icon={<UserOutlined />} />
+                  <Avatar 
+                    src={user?.avatarUrl ? (user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:8080${user.avatarUrl}`) : undefined} 
+                    icon={<UserOutlined />} 
+                  />
                   <span className="username">{user?.username}</span>
                 </Space>
               </Dropdown>

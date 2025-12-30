@@ -34,7 +34,7 @@ export interface Document {
   title: string;
   ownerId: number;
   owner?: User;
-  visibility: 'PUBLIC' | 'PRIVATE';
+  visibility: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
   docType: string;
   forkedFromId?: number;
   content?: string;
@@ -45,12 +45,13 @@ export interface Document {
   updatedAt: string;
   isOwner?: boolean;
   canEdit?: boolean;
+  status?: string;
 }
 
 export interface CreateDocumentRequest {
   title: string;
   docType?: string;
-  visibility?: 'PUBLIC' | 'PRIVATE';
+  visibility?: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
   folderId?: number;
   tags?: string;
   content?: string;
