@@ -3,8 +3,8 @@ package com.example.backend.service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -12,20 +12,21 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import com.example.backend.dto.PageResponse;
 import com.example.backend.dto.document.CloneDocumentRequest;
 import com.example.backend.dto.document.CommitDocumentRequest;
-import com.example.backend.dto.document.DocumentCacheResponse;
 import com.example.backend.dto.document.CreateDocumentRequest;
+import com.example.backend.dto.document.DocumentCacheResponse;
 import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.dto.document.DocumentVersionDTO;
 import com.example.backend.dto.document.MoveDocumentRequest;
 import com.example.backend.dto.document.UpdateDocumentRequest;
+import com.example.backend.dto.websocket.WebSocketMessage;
 import com.example.backend.entity.Document;
 import com.example.backend.entity.DocumentFolder;
 import com.example.backend.entity.DocumentVersion;
@@ -36,7 +37,6 @@ import com.example.backend.repository.DocumentCollaboratorRepository;
 import com.example.backend.repository.DocumentFolderRepository;
 import com.example.backend.repository.DocumentRepository;
 import com.example.backend.repository.DocumentVersionRepository;
-import com.example.backend.dto.websocket.WebSocketMessage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +49,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DocumentService {
 
-    private static final String STATUS_ACTIVE = "active";
+    private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_DELETED = "deleted";
     
     private final DocumentRepository documentRepository;
@@ -87,6 +87,9 @@ public class DocumentService {
         
         // 创建初始版本
         createInitialVersion(document, owner);
+
+        // 同步写入物理文件，便于在存储目录下直接查看
+        persistLatestContent(document, document.getContent());
         
         return DocumentDTO.fromEntity(document, userId, true);
     }
@@ -165,6 +168,9 @@ public class DocumentService {
         // 更新文档内容
         document.setContent(request.getContent());
         documentRepository.save(document);
+
+        // 将最新内容持久化到物理文件
+        persistLatestContent(document, request.getContent());
         
         return DocumentVersionDTO.fromEntity(version);
     }
@@ -237,6 +243,7 @@ public class DocumentService {
                 .confirmedContent(confirmed)
                 .userDraftContent(collaborationCacheService.getDraft(documentId, userId))
                 .onlineUsers(collaborationCacheService.getOnlineUsers(documentId))
+            .draftTtlSeconds(collaborationCacheService.getDraftTtlSeconds(documentId, userId))
                 .build();
     }
     
@@ -254,8 +261,9 @@ public class DocumentService {
 
         if (isAdmin) {
             if (document.getStoragePath() != null) {
-                fileStorageService.deleteFile(document.getStoragePath());
+                fileStorageService.deleteDocumentStorage(document.getStoragePath());
             }
+            collaborationCacheService.clearDocumentState(documentId);
             documentRepository.delete(document);
             return;
         }
@@ -268,6 +276,9 @@ public class DocumentService {
         document.setStatus(STATUS_DELETED);
         document.setVisibility("private");
         documentRepository.save(document);
+
+        // 清理协作缓存（confirmed/draft/online）
+        collaborationCacheService.clearDocumentState(documentId);
     }
     
     /**
@@ -394,8 +405,25 @@ public class DocumentService {
         CommitDocumentRequest request = new CommitDocumentRequest();
         request.setContent(targetVersion.getContent());
         request.setCommitMessage("回滚到版本 " + targetVersion.getVersionNo());
-        
-        return commitDocument(documentId, userId, request);
+
+        DocumentVersionDTO result = commitDocument(documentId, userId, request);
+
+        // 刷新协作缓存：清空草稿，确认态回填回滚内容
+        collaborationCacheService.clearAllDrafts(documentId);
+        collaborationCacheService.saveConfirmed(documentId, targetVersion.getContent());
+
+        // 广播确认内容，让在线用户立即看到回滚结果
+        WebSocketMessage message = WebSocketMessage.builder()
+            .type("SAVE_CONFIRMED")
+            .documentId(documentId)
+            .userId(userId)
+            .nickname(userService.getUserById(userId).getUsername())
+            .data(Map.of("content", targetVersion.getContent()))
+            .timestamp(System.currentTimeMillis())
+            .build();
+        messagingTemplate.convertAndSend("/topic/document/" + documentId, message);
+
+        return result;
     }
     
     /**
@@ -436,6 +464,9 @@ public class DocumentService {
         
         // 创建初始版本
         createInitialVersion(clonedDocument, owner);
+
+        // 写入克隆后的内容
+        persistLatestContent(clonedDocument, clonedDocument.getContent());
         
         return DocumentDTO.fromEntity(clonedDocument, userId, true);
     }
@@ -489,6 +520,9 @@ public class DocumentService {
         
         document = documentRepository.save(document);
         createInitialVersion(document, owner);
+
+        // 写入导入的内容到物理文件
+        persistLatestContent(document, content);
         
         return DocumentDTO.fromEntity(document, userId, true);
     }
@@ -518,6 +552,7 @@ public class DocumentService {
     /**
      * 校验编辑权限并返回文档实体。
      */
+    @Transactional
     public Document getEditableDocument(Long documentId, Long userId) {
         Document document = getActiveDocument(documentId);
         if (!checkDocumentEditPermission(document, userId)) {
@@ -576,7 +611,7 @@ public class DocumentService {
         if (!legacyRoots.isEmpty()) {
             DocumentFolder root = legacyRoots.get(0);
             if (root.getStatus() == null) {
-                root.setStatus("active");
+                root.setStatus("ACTIVE");
             }
             return folderRepository.save(root);
         }
@@ -586,7 +621,7 @@ public class DocumentService {
                 .owner(owner)
                 .name("根目录")
                 .parent(null)
-                .status("active")
+                .status("ACTIVE")
                 .build();
         return folderRepository.save(root);
     }
@@ -664,6 +699,11 @@ public class DocumentService {
             return false;
         }
 
+        // 系统管理员允许预览
+        if (isAdminUser(userId)) {
+            return true;
+        }
+
         // 所有者可访问
         if (document.getOwner().getId().equals(userId)) {
             return true;
@@ -689,5 +729,37 @@ public class DocumentService {
         }
         // 协作者可编辑
         return collaboratorRepository.existsByDocumentIdAndUserId(document.getId(), userId);
+    }
+
+    /**
+     * 将最新内容写入存储目录，便于直接在 storage 目录查看落盘文件。
+     */
+    private void persistLatestContent(Document document, String content) {
+        if (document == null || document.getStoragePath() == null || document.getStoragePath().isBlank()) {
+            return;
+        }
+
+        String extension = "txt";
+        String docType = document.getDocType();
+        if (docType != null && (docType.equalsIgnoreCase("markdown") || docType.equalsIgnoreCase("md"))) {
+            extension = "md";
+        }
+
+        String fileName = document.getTitle() + "." + extension;
+        try {
+            byte[] bytes = content != null ? content.getBytes(StandardCharsets.UTF_8) : new byte[0];
+            fileStorageService.saveBytes(document.getStoragePath(), fileName, bytes);
+        } catch (Exception e) {
+            log.warn("写入文档物理文件失败 documentId={}", document != null ? document.getId() : null, e);
+        }
+    }
+
+    private boolean isAdminUser(Long userId) {
+        try {
+            User user = userService.getUserById(userId);
+            return user != null && "ADMIN".equalsIgnoreCase(user.getRole());
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

@@ -1,8 +1,8 @@
 package com.example.backend.service;
 
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.Cursor;
@@ -20,8 +20,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CollaborationCacheService {
 
-    private static final Duration DEFAULT_DRAFT_TTL = Duration.ofSeconds(60);
-    private static final Duration DEFAULT_SAVE_LOCK_TTL = Duration.ofSeconds(5);
+    //private static final Duration DEFAULT_DRAFT_TTL = Duration.ofSeconds(60);
+    //private static final Duration DEFAULT_SAVE_LOCK_TTL = Duration.ofSeconds(5);
+    private static final int DEFAULT_DRAFT_TTL_HOURS = 1;
+    private static final int DEFAULT_SAVE_LOCK_TTL_SECONDS = 5;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -30,7 +32,15 @@ public class CollaborationCacheService {
             return;
         }
         String key = draftKey(documentId, userId);
-        stringRedisTemplate.opsForValue().set(key, content, DEFAULT_DRAFT_TTL);
+        stringRedisTemplate.opsForValue().set(key, content, DEFAULT_DRAFT_TTL_HOURS, TimeUnit.HOURS);
+    }
+
+    public Long getDraftTtlSeconds(Long documentId, Long userId) {
+        if (documentId == null || userId == null) {
+            return null;
+        }
+        Long ttl = stringRedisTemplate.getExpire(draftKey(documentId, userId), TimeUnit.SECONDS);
+        return ttl != null && ttl >= 0 ? ttl : null;
     }
 
     public String getDraft(Long documentId, Long userId) {
@@ -65,7 +75,7 @@ public class CollaborationCacheService {
         if (documentId == null || token == null) {
             return false;
         }
-        Boolean locked = stringRedisTemplate.opsForValue().setIfAbsent(saveLockKey(documentId), token, DEFAULT_SAVE_LOCK_TTL);
+        Boolean locked = stringRedisTemplate.opsForValue().setIfAbsent(saveLockKey(documentId), token, DEFAULT_SAVE_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
         return Boolean.TRUE.equals(locked);
     }
 

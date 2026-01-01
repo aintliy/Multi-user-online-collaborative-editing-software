@@ -15,4 +15,5 @@ public class DocumentCacheResponse {
     private String confirmedContent;
     private String userDraftContent;
     private Set<Long> onlineUsers;
+    private Long draftTtlSeconds;
 }

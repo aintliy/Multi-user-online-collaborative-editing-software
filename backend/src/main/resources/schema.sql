@@ -6,7 +6,6 @@
 -- =====================================================
 
 DROP TABLE IF EXISTS operation_logs CASCADE;
-DROP TABLE IF EXISTS tasks CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TABLE IF EXISTS comments CASCADE;
@@ -18,6 +17,7 @@ DROP TABLE IF EXISTS document_versions CASCADE;
 DROP TABLE IF EXISTS documents CASCADE;
 DROP TABLE IF EXISTS document_folders CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+
 
 -- =====================================================
 -- 1. 用户表 (users)
@@ -64,7 +64,7 @@ CREATE INDEX idx_doc_folders_owner ON document_folders(owner_id);
 CREATE INDEX idx_doc_folders_parent ON document_folders(parent_id);
 
 COMMENT ON TABLE document_folders IS '文档文件夹表，支持多级嵌套';
-COMMENT ON COLUMN document_folders.parent_id IS '父文件夹ID，NULL表示根目录下的一级文件夹';
+COMMENT ON COLUMN document_folders.parent_id IS '父文件夹ID，NULL表示根目录';
 
 -- =====================================================
 -- 3. 文档表 (documents)
@@ -94,9 +94,9 @@ CREATE INDEX idx_documents_status ON documents(status);
 COMMENT ON TABLE documents IS '文档表';
 COMMENT ON COLUMN documents.doc_type IS '文档类型: markdown / docx / txt / sheet / slide';
 COMMENT ON COLUMN documents.visibility IS '可见性: private-私有, public-公开';
-COMMENT ON COLUMN documents.folder_id IS '所属文件夹ID，NULL表示在根目录';
+COMMENT ON COLUMN documents.folder_id IS '所属文件夹ID';
 COMMENT ON COLUMN documents.forked_from_id IS '克隆来源文档ID';
-COMMENT ON COLUMN documents.storage_path IS '物理文件存储相对路径，格式: {ownerId}/{folderId}/，folderId为空表示用户根目录';
+COMMENT ON COLUMN documents.storage_path IS '物理文件存储相对路径，格式: {ownerId}/{folderId}/';
 
 -- =====================================================
 -- 4. 文档版本表 (document_versions)
@@ -261,37 +261,11 @@ CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
 
 COMMENT ON TABLE notifications IS '通知表';
-COMMENT ON COLUMN notifications.type IS '通知类型: COMMENT-评论, TASK-任务, PERMISSION-权限等';
+COMMENT ON COLUMN notifications.type IS '通知类型: COMMENT-评论, PERMISSION-权限等';
 COMMENT ON COLUMN notifications.reference_id IS '关联业务实体ID';
 
 -- =====================================================
--- 12. 任务表 (tasks)
--- =====================================================
-CREATE TABLE tasks (
-  id           BIGSERIAL PRIMARY KEY,
-  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  creator_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  assignee_id  BIGINT REFERENCES users(id),
-  title        VARCHAR(255) NOT NULL,
-  description  TEXT,
-  status       VARCHAR(20) DEFAULT 'todo',
-  priority     VARCHAR(20) DEFAULT 'MEDIUM',
-  due_date     DATE,
-  created_at   TIMESTAMP DEFAULT NOW(),
-  updated_at   TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_tasks_document ON tasks(document_id);
-CREATE INDEX idx_tasks_creator ON tasks(creator_id);
-CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
-CREATE INDEX idx_tasks_status ON tasks(status);
-
-COMMENT ON TABLE tasks IS '任务表';
-COMMENT ON COLUMN tasks.status IS '任务状态: todo-待办, doing-进行中, done-已完成';
-COMMENT ON COLUMN tasks.priority IS '优先级: LOW-低, MEDIUM-中, HIGH-高';
-
--- =====================================================
--- 13. 操作日志表 (operation_logs)
+-- 12. 操作日志表 (operation_logs)
 -- =====================================================
 CREATE TABLE operation_logs (
   id           BIGSERIAL PRIMARY KEY,

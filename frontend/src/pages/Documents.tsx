@@ -87,7 +87,7 @@ const Documents: React.FC = () => {
         params.keyword = searchKeyword;
       }
       const data = await documentApi.getList(params);
-      setDocuments(data.content);
+      setDocuments(data.items);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
     } finally {
@@ -488,8 +488,8 @@ const Documents: React.FC = () => {
                       </div>
                       <div className="document-meta">
                         <span>更新于 {dayjs(doc.updatedAt).format('YYYY-MM-DD HH:mm')}</span>
-                        {doc.owner && (
-                          <span className="owner">创建者: {doc.owner.username}</span>
+                        {doc.ownerName && (
+                          <span className="owner">创建者: {doc.ownerName}</span>
                         )}
                       </div>
                     </div>

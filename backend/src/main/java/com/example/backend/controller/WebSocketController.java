@@ -1,5 +1,19 @@
 package com.example.backend.controller;
 
+import java.security.Principal;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.annotation.SendToUser;
+import org.springframework.stereotype.Controller;
+
 import com.example.backend.dto.websocket.CursorPosition;
 import com.example.backend.dto.websocket.DocumentOperation;
 import com.example.backend.dto.websocket.WebSocketMessage;
@@ -9,22 +23,9 @@ import com.example.backend.repository.UserRepository;
 import com.example.backend.service.ChatService;
 import com.example.backend.service.CollaborationCacheService;
 import com.example.backend.service.DocumentService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.handler.annotation.DestinationVariable;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.handler.annotation.SendTo;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.messaging.simp.annotation.SendToUser;
-import org.springframework.stereotype.Controller;
-
-import java.security.Principal;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * WebSocket协作控制器
@@ -114,6 +115,11 @@ public class WebSocketController {
                 .build();
 
         messagingTemplate.convertAndSend("/topic/document/" + documentId, message);
+
+        // 所有人离开后清空该文档的协作缓存
+        if (collaborationCacheService.getOnlineUsers(documentId).isEmpty()) {
+            collaborationCacheService.clearDocumentState(documentId);
+        }
         log.info("用户 {} 离开文档 {} 协作", user.getUsername(), documentId);
     }
     

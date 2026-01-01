@@ -10,7 +10,7 @@ ALTER TABLE documents
 ADD COLUMN storage_path VARCHAR(512);
 
 -- 2. 添加字段注释
-COMMENT ON COLUMN documents.storage_path IS '物理文件存储相对路径，格式: {ownerId}/{folderId}/，folderId为空表示用户根目录';
+COMMENT ON COLUMN documents.storage_path IS '物理文件存储相对路径，格式: {ownerId}/{folderId}/';
 
 -- 3. (可选) 为现有文档初始化 storage_path
 -- 注意：此脚本会为所有现有文档创建物理目录路径

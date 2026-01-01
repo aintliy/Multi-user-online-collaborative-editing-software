@@ -17,6 +17,7 @@ import {
   Drawer,
   Badge,
   Tabs,
+  Spin,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -25,19 +26,18 @@ import {
   HistoryOutlined,
   TeamOutlined,
   CommentOutlined,
-  CheckSquareOutlined,
   MessageOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
-import { documentApi, collaboratorApi, commentApi, taskApi, chatApi, userApi } from '../api';
+import { documentApi, collaboratorApi, commentApi, chatApi, userApi } from '../api';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentStore } from '../store/useDocumentStore';
 import wsService from '../utils/websocket';
-import type { Document, DocumentVersion, Collaborator, Comment, Task, ChatMessage, User } from '../types';
+import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User } from '../types';
 import dayjs from 'dayjs';
 import './DocumentEdit.scss';
-
+ 
 const { Header, Sider, Content } = Layout;
 const { TextArea } = Input;
 
@@ -57,11 +57,16 @@ const DocumentEdit: React.FC = () => {
   const { content, setContent, setCurrentDocument, onlineUsers, addOnlineUser, removeOnlineUser, updateCursor, clearOnlineData, setOnlineUsers, setDirty } = useDocumentStore();
   const editorRef = useRef<any>(null);
   const applyingRemoteRef = useRef(false);
+  const joinedRef = useRef(false);
   
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [draftTtlSeconds, setDraftTtlSeconds] = useState<number | null>(null);
+  const [ttlWarningShown, setTtlWarningShown] = useState(false);
+  const [visibilityUpdating, setVisibilityUpdating] = useState(false);
   
   // Panels
   const [collaboratorsDrawerOpen, setCollaboratorsDrawerOpen] = useState(false);
@@ -73,7 +78,6 @@ const DocumentEdit: React.FC = () => {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   
@@ -81,30 +85,39 @@ const DocumentEdit: React.FC = () => {
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [addCollaboratorModalOpen, setAddCollaboratorModalOpen] = useState(false);
   const [searchUsers, setSearchUsers] = useState<User[]>([]);
+  const ttlTimerRef = useRef<number | null>(null);
   
   const [form] = Form.useForm();
   const [collaboratorForm] = Form.useForm();
 
   const documentId = parseInt(id!);
+  const isAdmin = user?.role === 'ADMIN';
+  const isPreviewMode = document ? document.canEdit === false : false;
 
   useEffect(() => {
     fetchDocument();
     
     return () => {
-      wsService.leaveDocument();
+      if (joinedRef.current) {
+        wsService.leaveDocument();
+        joinedRef.current = false;
+      }
       clearOnlineData();
+      if (ttlTimerRef.current) {
+        clearInterval(ttlTimerRef.current);
+      }
     };
   }, [documentId]);
 
   useEffect(() => {
-    if (document && token) {
-      // Connect WebSocket and join document
+    if (document && token && !isPreviewMode) {
       wsService.connect(token).then(() => {
         wsService.joinDocument(documentId);
+        joinedRef.current = true;
         setupWebSocketHandlers();
       }).catch(console.error);
     }
-  }, [document, token]);
+  }, [document, token, isPreviewMode]);
 
   const setupWebSocketHandlers = () => {
     wsService.onMessage('JOIN', (msg) => {
@@ -174,12 +187,16 @@ const DocumentEdit: React.FC = () => {
       setContent(doc.content || '');
       setDirty(false);
       setIsDirty(false);
+      const previewMode = doc.canEdit === false;
       
       // Fetch related data
-      fetchDocumentCache();
+      if (!previewMode) {
+        await fetchDocumentCache();
+      } else {
+        setDraftTtlSeconds(null);
+      }
       fetchCollaborators();
       fetchComments();
-      fetchTasks();
       fetchChatHistory();
     } catch (error: any) {
       message.error('加载文档失败');
@@ -193,6 +210,7 @@ const DocumentEdit: React.FC = () => {
     try {
       const cache = await documentApi.getCache(documentId);
       const nextContent = cache.userDraftContent ?? cache.confirmedContent ?? content;
+      setDraftTtlSeconds(cache.draftTtlSeconds ?? null);
       if (nextContent !== undefined) {
         applyRemoteContent(nextContent, false);
       }
@@ -200,6 +218,33 @@ const DocumentEdit: React.FC = () => {
       console.error('Failed to fetch document cache:', error);
     }
   };
+
+  // Draft TTL 倒计时与提醒
+  useEffect(() => {
+    ttlTimerRef.current = setInterval(() => {
+      setDraftTtlSeconds((prev) => {
+        if (prev === null) return null;
+        return Math.max(prev - 1, 0);
+      });
+    }, 1000);
+
+    return () => {
+      if (ttlTimerRef.current) {
+        clearInterval(ttlTimerRef.current);
+        ttlTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (draftTtlSeconds !== null && draftTtlSeconds <= 180 && !ttlWarningShown) {
+      message.warning('草稿缓存即将过期，请及时保存');
+      setTtlWarningShown(true);
+    }
+    if (draftTtlSeconds !== null && draftTtlSeconds > 180 && ttlWarningShown) {
+      setTtlWarningShown(false);
+    }
+  }, [draftTtlSeconds, ttlWarningShown]);
 
   const fetchCollaborators = async () => {
     try {
@@ -213,7 +258,7 @@ const DocumentEdit: React.FC = () => {
   const fetchVersions = async () => {
     try {
       const data = await documentApi.getVersions(documentId);
-      setVersions(data.content);
+      setVersions(data.items);
     } catch (error) {
       console.error('Failed to fetch versions:', error);
     }
@@ -228,19 +273,10 @@ const DocumentEdit: React.FC = () => {
     }
   };
 
-  const fetchTasks = async () => {
-    try {
-      const data = await taskApi.getList(documentId);
-      setTasks(data);
-    } catch (error) {
-      console.error('Failed to fetch tasks:', error);
-    }
-  };
-
   const fetchChatHistory = async () => {
     try {
       const data = await chatApi.getHistory(documentId);
-      setChatMessages(data.content);
+      setChatMessages(data.items);
     } catch (error) {
       console.error('Failed to fetch chat history:', error);
     }
@@ -263,6 +299,9 @@ const DocumentEdit: React.FC = () => {
   };
 
   const handleEditorChange = useCallback((value: string | undefined) => {
+    if (isPreviewMode) {
+      return;
+    }
     if (applyingRemoteRef.current) {
       applyingRemoteRef.current = false;
       return;
@@ -274,17 +313,18 @@ const DocumentEdit: React.FC = () => {
       setDirty(true);
       wsService.sendDraftEdit(value);
     }
-  }, [setDirty]);
+  }, [setDirty, isPreviewMode]);
 
   const handleEditorMount = (editor: any) => {
     editorRef.current = editor;
     
     // Track cursor position
     editor.onDidChangeCursorPosition((e: any) => {
+      if (!user) return;
       wsService.sendCursor({
         line: e.position.lineNumber,
         column: e.position.column,
-        userId: user!.id,
+        userId: user.id,
       });
     });
   };
@@ -325,15 +365,33 @@ const DocumentEdit: React.FC = () => {
       content: '回滚后当前内容将被覆盖，确定要回滚到此版本吗？',
       onOk: async () => {
         try {
+          setRollingBack(true);
           await documentApi.rollbackVersion(documentId, versionId);
           message.success('回滚成功');
           fetchDocument();
           setHistoryDrawerOpen(false);
         } catch (error: any) {
           message.error(error.response?.data?.message || '回滚失败');
+        } finally {
+          setRollingBack(false);
         }
       },
     });
+  };
+
+  const handleVisibilityChange = async (value: 'public' | 'private') => {
+    if (!document) return;
+    setVisibilityUpdating(true);
+    try {
+      const updated = await documentApi.update(documentId, { visibility: value });
+      setDocument(updated);
+      setCurrentDocument(updated);
+      message.success(value === 'public' ? '已设为公开' : '已设为私有');
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '更新可见性失败');
+    } finally {
+      setVisibilityUpdating(false);
+    }
   };
 
   const handleSearchUsers = async (keyword: string) => {
@@ -353,7 +411,6 @@ const DocumentEdit: React.FC = () => {
     try {
       await collaboratorApi.add(documentId, {
         userId: values.userId,
-        role: values.role,
       });
       message.success('添加协作者成功');
       setAddCollaboratorModalOpen(false);
@@ -390,27 +447,6 @@ const DocumentEdit: React.FC = () => {
     }
   };
 
-  const handleAddTask = async (title: string) => {
-    try {
-      await taskApi.create(documentId, { title });
-      message.success('任务创建成功');
-      fetchTasks();
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '创建失败');
-    }
-  };
-
-  const handleToggleTask = async (task: Task) => {
-    try {
-      await taskApi.update(task.id, {
-        status: task.status === 'DONE' ? 'TODO' : 'DONE',
-      });
-      fetchTasks();
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '更新失败');
-    }
-  };
-
   const exportMenuItems = [
     { key: 'pdf', label: 'PDF (.pdf)', onClick: () => window.open(documentApi.exportPdf(documentId)) },
     { key: 'txt', label: '文本 (.txt)', onClick: () => window.open(documentApi.exportTxt(documentId)) },
@@ -432,7 +468,27 @@ const DocumentEdit: React.FC = () => {
           />
           <span className="doc-title">{document?.title}</span>
           {document?.docType && <Tag color="cyan">{document.docType.toUpperCase()}</Tag>}
-          {isDirty && <Tag color="orange">未保存</Tag>}
+          {document?.visibility && (
+            document?.isOwner ? (
+              <Select
+                size="small"
+                value={document.visibility?.toLowerCase() === 'public' ? 'public' : 'private'}
+                style={{ width: 120 }}
+                onChange={handleVisibilityChange}
+                loading={visibilityUpdating}
+                options={[
+                  { value: 'private', label: '私有' },
+                  { value: 'public', label: '公开' },
+                ]}
+              />
+            ) : (
+              <Tag color={document.visibility === 'public' ? 'green' : 'default'}>
+                {document.visibility === 'public' ? '公开' : '私有'}
+              </Tag>
+            )
+          )}
+          {isPreviewMode && <Tag color="volcano">预览模式</Tag>}
+          {!isPreviewMode && isDirty && <Tag color="orange">未保存</Tag>}
         </div>
         <div className="header-center">
           <Space>
@@ -440,7 +496,7 @@ const DocumentEdit: React.FC = () => {
               <Tooltip key={u.id} title={u.username}>
                 <Avatar
                   size="small"
-                  src={u.avatarUrl}
+                  src={u.avatarUrl || undefined}
                   icon={<UserOutlined />}
                   style={{ backgroundColor: `hsl(${u.id * 30 % 360}, 70%, 50%)` }}
                 />
@@ -450,12 +506,18 @@ const DocumentEdit: React.FC = () => {
         </div>
         <div className="header-right">
           <Space>
-            <Button icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
-              保存
-            </Button>
-            <Button onClick={() => setCommitModalOpen(true)}>
-              提交版本
-            </Button>
+            {!isPreviewMode && (
+              <>
+                <Button icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+                  {draftTtlSeconds !== null && draftTtlSeconds <= 180
+                    ? `保存 (缓存剩余 ${Math.max(Math.ceil(draftTtlSeconds / 60), 0)} 分)`
+                    : '保存'}
+                </Button>
+                <Button onClick={() => setCommitModalOpen(true)}>
+                  提交版本
+                </Button>
+              </>
+            )}
             <Dropdown menu={{ items: exportMenuItems }}>
               <Button icon={<DownloadOutlined />}>导出</Button>
             </Dropdown>
@@ -466,11 +528,13 @@ const DocumentEdit: React.FC = () => {
                 setHistoryDrawerOpen(true);
               }}
             />
-            <Button
-              icon={<TeamOutlined />}
-              onClick={() => setCollaboratorsDrawerOpen(true)}
-            />
-            <Badge count={comments.length + tasks.length}>
+            {!isPreviewMode && (
+              <Button
+                icon={<TeamOutlined />}
+                onClick={() => setCollaboratorsDrawerOpen(true)}
+              />
+            )}
+            <Badge count={comments.length}>
               <Button
                 icon={<CommentOutlined />}
                 onClick={() => setRightPanelOpen(!rightPanelOpen)}
@@ -482,23 +546,37 @@ const DocumentEdit: React.FC = () => {
       
       <Layout>
         <Content className="edit-content">
-          <Editor
-            height="100%"
-            language={document ? getEditorLanguage(document.docType) : 'markdown'}
-            value={content}
-            onChange={handleEditorChange}
-            onMount={handleEditorMount}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 14,
-              lineNumbers: 'on',
-              wordWrap: 'on',
-              automaticLayout: true,
-            }}
-          />
+          {isPreviewMode ? (
+            <div className="preview-wrapper">
+              <div className="preview-banner">
+                <Tag color="blue">预览模式</Tag>
+                {isAdmin && <Tag color="geekblue">管理员查看</Tag>}
+                {!document?.canEdit && <Tag color="gold">无协作权限</Tag>}
+              </div>
+              <pre className="preview-content">{content}</pre>
+            </div>
+          ) : (
+            <Spin spinning={rollingBack} tip="回滚中...">
+              <Editor
+                height="100%"
+                language={document ? getEditorLanguage(document.docType) : 'markdown'}
+                value={content}
+                onChange={handleEditorChange}
+                onMount={handleEditorMount}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  wordWrap: 'on',
+                  automaticLayout: true,
+                  readOnly: isPreviewMode,
+                }}
+              />
+            </Spin>
+          )}
         </Content>
         
-        {rightPanelOpen && (
+        {!isPreviewMode && rightPanelOpen && (
           <Sider width={360} theme="light" className="right-panel">
             <Tabs
               activeKey={activeTab}
@@ -514,7 +592,7 @@ const DocumentEdit: React.FC = () => {
                         renderItem={(comment) => (
                           <List.Item>
                             <List.Item.Meta
-                              avatar={<Avatar src={comment.user?.avatarUrl} icon={<UserOutlined />} />}
+                              avatar={<Avatar src={comment.user?.avatarUrl || undefined} icon={<UserOutlined />} />}
                               title={comment.user?.username}
                               description={
                                 <>
@@ -545,48 +623,6 @@ const DocumentEdit: React.FC = () => {
                   ),
                 },
                 {
-                  key: 'tasks',
-                  label: <span><CheckSquareOutlined /> 任务</span>,
-                  children: (
-                    <div className="panel-content">
-                      <List
-                        dataSource={tasks}
-                        renderItem={(task) => (
-                          <List.Item
-                            actions={[
-                              <Button
-                                type="text"
-                                size="small"
-                                onClick={() => handleToggleTask(task)}
-                              >
-                                {task.status === 'DONE' ? '标记未完成' : '标记完成'}
-                              </Button>,
-                            ]}
-                          >
-                            <List.Item.Meta
-                              title={
-                                <span style={{ textDecoration: task.status === 'DONE' ? 'line-through' : 'none' }}>
-                                  {task.title}
-                                </span>
-                              }
-                              description={task.assignee?.username}
-                            />
-                          </List.Item>
-                        )}
-                      />
-                      <div className="add-task">
-                        <Input
-                          placeholder="添加任务..."
-                          onPressEnter={(e) => {
-                            handleAddTask((e.target as any).value);
-                            (e.target as any).value = '';
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ),
-                },
-                {
                   key: 'chat',
                   label: <span><MessageOutlined /> 聊天</span>,
                   children: (
@@ -597,7 +633,7 @@ const DocumentEdit: React.FC = () => {
                             key={index}
                             className={`chat-message ${msg.user?.id === user?.id ? 'own' : ''}`}
                           >
-                            <Avatar size="small" src={msg.user?.avatarUrl} icon={<UserOutlined />} />
+                            <Avatar size="small" src={msg.user?.avatarUrl || undefined} icon={<UserOutlined />} />
                             <div className="message-content">
                               <div className="message-user">{msg.user?.username}</div>
                               <div className="message-text">{msg.content}</div>
@@ -659,12 +695,12 @@ const DocumentEdit: React.FC = () => {
               ]}
             >
               <List.Item.Meta
-                title={version.commitMessage || `版本 ${version.versionNumber}`}
+                title={version.commitMessage || `版本 ${version.versionNo}`}
                 description={
                   <>
-                    <div>v{version.versionNumber}</div>
+                    <div>v{version.versionNo}</div>
                     <div>{dayjs(version.createdAt).format('YYYY-MM-DD HH:mm')}</div>
-                    <div>提交者: {version.createdBy?.username}</div>
+                    <div>提交者: {version.createdByName || '未知'}</div>
                   </>
                 }
               />
@@ -690,7 +726,7 @@ const DocumentEdit: React.FC = () => {
           renderItem={(collaborator) => (
             <List.Item
               actions={[
-                collaborator.user?.id !== document?.owner?.id && (
+                collaborator.user?.id !== document?.ownerId && (
                   <Button
                     danger
                     size="small"
@@ -702,16 +738,15 @@ const DocumentEdit: React.FC = () => {
               ]}
             >
               <List.Item.Meta
-                avatar={<Avatar src={collaborator.user?.avatarUrl} icon={<UserOutlined />} />}
+                avatar={<Avatar src={collaborator.user?.avatarUrl || undefined} icon={<UserOutlined />} />}
                 title={
                   <Space>
                     {collaborator.user?.username}
-                    {collaborator.user?.id === document?.owner?.id && (
+                    {collaborator.user?.id === document?.ownerId && (
                       <Tag color="gold">所有者</Tag>
                     )}
                   </Space>
                 }
-                description={collaborator.role}
               />
             </List.Item>
           )}
@@ -743,17 +778,11 @@ const DocumentEdit: React.FC = () => {
               {searchUsers.map((u) => (
                 <Select.Option key={u.id} value={u.id}>
                   <Space>
-                    <Avatar size="small" src={u.avatarUrl} icon={<UserOutlined />} />
+                    <Avatar size="small" src={u.avatarUrl || undefined} icon={<UserOutlined />} />
                     {u.username}
                   </Space>
                 </Select.Option>
               ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="role" label="角色" initialValue="EDITOR">
-            <Select>
-              <Select.Option value="VIEWER">查看者</Select.Option>
-              <Select.Option value="EDITOR">编辑者</Select.Option>
             </Select>
           </Form.Item>
         </Form>

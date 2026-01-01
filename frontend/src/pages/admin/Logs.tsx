@@ -39,11 +39,11 @@ const Logs: React.FC = () => {
     try {
       const data = await adminApi.getOperationLogs({
         operationType,
-        page: page - 1,
+        page,
         pageSize,
       });
-      setLogs(data.content);
-      setTotal(data.totalElements);
+      setLogs(data.items);
+      setTotal(data.total);
     } catch (error) {
       console.error('Failed to fetch logs:', error);
     } finally {

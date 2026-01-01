@@ -74,7 +74,7 @@ public class Document {
      */
     @Column(length = 20)
     @Builder.Default
-    private String status = "active";
+    private String status = "ACTIVE";
     
     /**
      * 物理文件存储相对路径，格式: {ownerId}/{folderId}/

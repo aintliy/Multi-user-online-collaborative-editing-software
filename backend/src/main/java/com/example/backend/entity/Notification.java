@@ -33,7 +33,7 @@ public class Notification {
     private User receiver;
     
     /**
-     * 通知类型: COMMENT / TASK / PERMISSION / FRIEND_REQUEST / WORKSPACE_REQUEST 等
+     * 通知类型: COMMENT / PERMISSION / FRIEND_REQUEST / WORKSPACE_REQUEST 等
      */
     @Column(length = 50, nullable = false)
     private String type;

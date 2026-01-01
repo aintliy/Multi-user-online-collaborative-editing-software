@@ -33,7 +33,7 @@ const PublicDocuments: React.FC = () => {
       const data = await documentApi.searchPublic({
         keyword: searchKeyword || undefined,
       });
-      setDocuments(data.content);
+      setDocuments(data.items);
     } catch (error) {
       console.error('Failed to fetch public documents:', error);
     } finally {
@@ -109,17 +109,24 @@ const PublicDocuments: React.FC = () => {
                 <Card
                   className="document-card"
                   hoverable
+                  onClick={() => navigate(`/documents/${doc.id}`)}
                   actions={[
                     <Button
                       type="text"
                       icon={<CopyOutlined />}
-                      onClick={() => handleClone(doc)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClone(doc);
+                      }}
                     >
                       克隆
                     </Button>,
                     <Button
                       type="text"
-                      onClick={() => handleRequestAccess(doc)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestAccess(doc);
+                      }}
                     >
                       申请协作
                     </Button>,
@@ -131,7 +138,7 @@ const PublicDocuments: React.FC = () => {
                     description={
                       <div className="doc-info">
                         <div className="doc-owner">
-                          <UserOutlined /> {doc.owner?.username}
+                          <UserOutlined /> {doc.ownerName || '未知用户'}
                         </div>
                         <div className="doc-time">
                           <ClockCircleOutlined /> {dayjs(doc.updatedAt).format('YYYY-MM-DD')}

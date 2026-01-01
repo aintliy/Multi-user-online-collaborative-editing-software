@@ -25,7 +25,7 @@ const Notifications: React.FC = () => {
     setLoading(true);
     try {
       const data = await notificationApi.getList();
-      setNotifications(data.content);
+      setNotifications(data.items);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
     } finally {

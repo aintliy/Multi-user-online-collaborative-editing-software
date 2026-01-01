@@ -120,7 +120,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role("USER")
-                .status("active")
+                .status("ACTIVE")
                 .build();
         
         user = userRepository.save(user);
@@ -156,7 +156,7 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在"));
         
         // 检查用户状态
-        if (!"active".equals(user.getStatus())) {
+        if (!"ACTIVE".equals(user.getStatus())) {
             throw new BusinessException(ErrorCode.USER_DISABLED, "账号已被禁用，请联系管理员");
         }
         

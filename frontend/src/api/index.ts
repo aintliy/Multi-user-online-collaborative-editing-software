@@ -14,7 +14,6 @@ import type {
   WorkspaceRequest,
   Friend,
   Comment,
-  Task,
   Notification,
   ChatMessage,
   PageResponse,
@@ -250,25 +249,6 @@ export const commentApi = {
   // 更新评论状态
   update: (commentId: number, data: { status?: string }) =>
     put<Comment>(`/comments/${commentId}`, data),
-};
-
-// ========== 任务相关 API ==========
-export const taskApi = {
-  // 创建任务
-  create: (documentId: number, data: { title: string; description?: string; assigneeId?: number; priority?: string; dueDate?: string }) =>
-    post<Task>(`/documents/${documentId}/tasks`, data),
-  
-  // 获取任务列表
-  getList: (documentId: number) =>
-    get<Task[]>(`/documents/${documentId}/tasks`),
-  
-  // 更新任务
-  update: (taskId: number, data: Partial<Task>) =>
-    put<Task>(`/tasks/${taskId}`, data),
-  
-  // 删除任务
-  delete: (taskId: number) =>
-    del<void>(`/tasks/${taskId}`),
 };
 
 // ========== 通知相关 API ==========

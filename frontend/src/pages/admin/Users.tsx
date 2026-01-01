@@ -38,11 +38,11 @@ const Users: React.FC = () => {
       const data = await adminApi.getUsers({
         keyword: keyword || undefined,
         status: statusFilter,
-        page: page - 1,
+        page,
         pageSize,
       });
-      setUsers(data.content);
-      setTotal(data.totalElements);
+      setUsers(data.items);
+      setTotal(data.total);
     } catch (error) {
       console.error('Failed to fetch users:', error);
     } finally {

@@ -34,11 +34,11 @@ const Documents: React.FC = () => {
     try {
       const data = await adminApi.getDocuments({
         keyword: keyword || undefined,
-        page: page - 1,
+        page,
         pageSize,
       });
-      setDocuments(data.content);
-      setTotal(data.totalElements);
+      setDocuments(data.items);
+      setTotal(data.total);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
     } finally {
@@ -71,7 +71,7 @@ const Documents: React.FC = () => {
     },
     {
       title: '所有者',
-      dataIndex: ['owner', 'username'],
+      render: (_, record) => record.ownerName || record.owner?.username || '未知',
     },
     {
       title: '可见性',

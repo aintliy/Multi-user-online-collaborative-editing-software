@@ -33,6 +33,8 @@ export interface Document {
   id: number;
   title: string;
   ownerId: number;
+  ownerName?: string;
+  ownerPublicId?: string;
   owner?: User;
   visibility: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
   docType: 'markdown' | 'txt';
@@ -40,7 +42,7 @@ export interface Document {
   content?: string;
   tags?: string;
   folderId?: number;
-  folder?: Folder;
+  folderName?: string;
   createdAt: string;
   updatedAt: string;
   isOwner?: boolean;
@@ -60,10 +62,11 @@ export interface CreateDocumentRequest {
 export interface DocumentVersion {
   id: number;
   documentId: number;
-  versionNumber: number;
+  versionNo: number;
   content: string;
   commitMessage?: string;
-  createdBy?: User;
+  createdById?: number;
+  createdByName?: string;
   createdAt: string;
 }
 
@@ -71,6 +74,7 @@ export interface DocumentCacheResponse {
   confirmedContent?: string;
   userDraftContent?: string;
   onlineUsers?: number[];
+  draftTtlSeconds?: number | null;
 }
 
 // 文件夹相关类型
@@ -126,19 +130,6 @@ export interface Comment {
   replies?: Comment[];
 }
 
-// 任务相关类型
-export interface Task {
-  id: number;
-  documentId: number;
-  title: string;
-  description?: string;
-  assignee?: User;
-  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  dueDate?: string;
-  createdAt: string;
-}
-
 // 通知相关类型
 export interface Notification {
   id: number;
@@ -167,11 +158,10 @@ export interface ApiResponse<T> {
 }
 
 export interface PageResponse<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  size: number;
-  number: number;
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 // WebSocket消息类型

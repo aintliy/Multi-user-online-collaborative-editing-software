@@ -33,6 +33,7 @@ public class FolderService {
     private final UserService userService;
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
+    private final CollaborationCacheService collaborationCacheService;
     
     /**
      * 获取用户的文件夹树
@@ -98,7 +99,7 @@ public class FolderService {
         if (!legacyRoots.isEmpty()) {
             DocumentFolder root = legacyRoots.get(0);
             if (root.getStatus() == null) {
-                root.setStatus("active");
+                root.setStatus("ACTIVE");
             }
             return folderRepository.save(root);
         }
@@ -108,7 +109,7 @@ public class FolderService {
                 .owner(owner)
                 .name("根目录")
                 .parent(null)
-                .status("active")
+                .status("ACTIVE")
                 .build();
         return folderRepository.save(root);
     }
@@ -159,6 +160,7 @@ public class FolderService {
             doc.setFolder(null);
             doc.setStatus("deleted");
             doc.setVisibility("private");
+            collaborationCacheService.clearDocumentState(doc.getId());
         });
 
         documentRepository.saveAll(documents);
@@ -173,6 +175,7 @@ public class FolderService {
                 if (document.getStoragePath() != null) {
                     fileStorageService.deleteDocumentStorage(document.getStoragePath());
                 }
+                collaborationCacheService.clearDocumentState(document.getId());
                 documentRepository.delete(document);
             }
         }
@@ -200,7 +203,7 @@ public class FolderService {
                 .owner(owner)
                 .name(request.getName())
             .parent(parent)
-            .status("active")
+            .status("ACTIVE")
                 .build();
         
         folder = folderRepository.save(folder);

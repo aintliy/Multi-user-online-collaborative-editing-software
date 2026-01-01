@@ -50,9 +50,10 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 // Guest Route Component (redirect if logged in)
 const GuestRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   if (token) {
-    return <Navigate to="/" replace />;
+    const target = user?.role === 'ADMIN' ? '/admin' : '/';
+    return <Navigate to={target} replace />;
   }
   return <>{children}</>;
 };

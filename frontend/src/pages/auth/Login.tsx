@@ -21,7 +21,8 @@ const Login: React.FC = () => {
       const response = await authApi.login(values);
       setAuth(response.token, response.user);
       message.success('登录成功');
-      navigate('/');
+      const targetPath = response.user.role === 'ADMIN' ? '/admin' : '/';
+      navigate(targetPath);
     } catch (error: any) {
       message.error(error.response?.data?.message || '登录失败');
     } finally {

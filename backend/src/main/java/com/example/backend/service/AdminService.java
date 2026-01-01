@@ -42,7 +42,7 @@ public class AdminService {
     public Map<String, Object> getStats() {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalUsers", userRepository.count());
-        stats.put("activeUsers", userRepository.countByStatus("ACTIVE"));
+        stats.put("ACTIVEUsers", userRepository.countByStatus("ACTIVE"));
         stats.put("bannedUsers", userRepository.countByStatus("BANNED"));
         stats.put("totalDocuments", documentRepository.count());
         stats.put("publicDocuments", documentRepository.countByVisibility("public"));

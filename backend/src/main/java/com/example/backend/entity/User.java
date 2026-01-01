@@ -49,11 +49,11 @@ public class User {
     private String profile;
     
     /**
-     * 用户状态: active / disabled
+     * 用户状态: ACTIVE / disabled
      */
     @Column(length = 20)
     @Builder.Default
-    private String status = "active";
+    private String status = "ACTIVE";
     
     /**
      * 系统角色: ADMIN / USER

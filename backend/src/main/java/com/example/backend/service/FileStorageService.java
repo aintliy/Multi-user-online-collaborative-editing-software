@@ -5,16 +5,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.backend.entity.DocumentFolder;
 import com.example.backend.exception.BusinessException;
 import com.example.backend.exception.ErrorCode;
+import com.example.backend.repository.DocumentFolderRepository;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -23,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FileStorageService {
     
     /**
@@ -30,13 +37,15 @@ public class FileStorageService {
      */
     @Value("${file.storage.root:backend/storage}")
     private String storageRoot;
+
+    private final DocumentFolderRepository folderRepository;
     
     /**
      * 为文档创建物理存储目录
      * 
      * @param ownerId 文档所有者ID
-     * @param folderId 文档所属文件夹ID，null表示用户根目录
-     * @return 相对存储路径，格式: {ownerId}/{folderId}/
+     * @param folderId 文档所属文件夹ID
+     * @return 相对存储路径，格式: {ownerId}/root/{parentId/.../}folderId/
      */
     public String createDocumentStoragePath(Long ownerId, Long folderId) {
         try {
@@ -58,14 +67,41 @@ public class FileStorageService {
      * 构建相对存储路径
      * 
      * @param ownerId 所有者ID
-     * @param folderId 文件夹ID，null表示根目录
-     * @return 相对路径，格式: {ownerId}/{folderId}/
+     * @param folderId 文件夹ID
+     * @return 相对路径，格式: {ownerId}/root/{parentId/.../}folderId/
      */
     private String buildRelativePath(Long ownerId, Long folderId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(ownerId).append("/");
+
+        // 未指定文件夹则落在 root 下
         if (folderId == null) {
-            return ownerId.toString() + "/";
+            sb.append("root/");
+            return sb.toString();
         }
-        return ownerId + "/" + folderId + "/";
+
+        List<String> pathSegments = new ArrayList<>();
+        DocumentFolder current = folderRepository.findById(folderId).orElse(null);
+
+        int guard = 0;
+        while (current != null && guard < 100) {
+            pathSegments.add(current.getId().toString());
+            DocumentFolder parent = current.getParent();
+            if (parent == null || (parent.getId() != null && parent.getId().equals(current.getId()))) {
+                break;
+            }
+            current = parent;
+            guard++;
+        }
+
+        if (pathSegments.isEmpty()) {
+            pathSegments.add(folderId.toString());
+        }
+
+        Collections.reverse(pathSegments);
+        pathSegments.forEach(seg -> sb.append(seg).append("/"));
+
+        return sb.toString();
     }
     
     /**
