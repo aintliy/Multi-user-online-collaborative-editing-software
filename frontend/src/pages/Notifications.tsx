@@ -39,6 +39,7 @@ const Notifications: React.FC = () => {
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, isRead: true } : n)
       );
+      window.dispatchEvent(new Event('notification-read'));
     } catch (error: any) {
       message.error('操作失败');
     }

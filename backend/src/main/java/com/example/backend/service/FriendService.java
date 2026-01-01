@@ -1,5 +1,12 @@
 package com.example.backend.service;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.backend.dto.friend.FriendDTO;
 import com.example.backend.dto.friend.SendFriendRequest;
 import com.example.backend.entity.User;
@@ -7,13 +14,8 @@ import com.example.backend.entity.UserFriend;
 import com.example.backend.exception.BusinessException;
 import com.example.backend.exception.ErrorCode;
 import com.example.backend.repository.UserFriendRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 好友服务
@@ -79,7 +81,7 @@ public class FriendService {
     public List<FriendDTO> getPendingRequests(Long userId) {
         List<UserFriend> requests = friendRepository.findPendingRequestsForUser(userId);
         return requests.stream()
-                .map(r -> FriendDTO.fromEntity(r, false))
+                .map(r -> FriendDTO.fromEntity(r))
                 .collect(Collectors.toList());
     }
     
@@ -129,7 +131,7 @@ public class FriendService {
         }
         
         request.setStatus("REJECTED");
-        friendRepository.save(request);
+        friendRepository.delete(request);
     }
     
     /**
@@ -140,9 +142,7 @@ public class FriendService {
         List<FriendDTO> friends = new ArrayList<>();
         
         for (UserFriend friendship : friendships) {
-            // 判断当前用户是发起方还是接收方
-            boolean isSender = friendship.getUser().getId().equals(userId);
-            friends.add(FriendDTO.fromEntity(friendship, isSender));
+            friends.add(FriendDTO.fromEntity(friendship));
         }
         
         return friends;

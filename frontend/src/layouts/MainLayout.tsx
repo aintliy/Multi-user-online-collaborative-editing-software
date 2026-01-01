@@ -51,6 +51,10 @@ const MainLayout: React.FC = () => {
 
   useEffect(() => {
     fetchUnreadCount();
+
+    const handleLocalRead = () => fetchUnreadCount();
+    window.addEventListener('notification-read', handleLocalRead);
+    return () => window.removeEventListener('notification-read', handleLocalRead);
   }, []);
 
   const fetchUnreadCount = async () => {

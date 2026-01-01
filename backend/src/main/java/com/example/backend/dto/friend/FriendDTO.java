@@ -1,6 +1,7 @@
 package com.example.backend.dto.friend;
 
 import com.example.backend.entity.UserFriend;
+import com.example.backend.dto.auth.UserDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,20 +19,22 @@ import java.time.LocalDateTime;
 public class FriendDTO {
     
     private Long id;
-    private Long userId;
-    private String username;
-    private String publicId;
-    private String avatarUrl;
+    private UserDTO user;
+    private UserDTO friend;
     private String status;
     private LocalDateTime createdAt;
     
-    public static FriendDTO fromEntity(UserFriend userFriend, boolean isSender) {
+    /**
+     * 从实体创建DTO
+     * 直接映射user和friend字段，不做转换
+     * user字段对应发起好友请求的用户
+     * friend字段对应接收好友请求的用户
+     */
+    public static FriendDTO fromEntity(UserFriend userFriend) {
         return FriendDTO.builder()
                 .id(userFriend.getId())
-                .userId(isSender ? userFriend.getFriend().getId() : userFriend.getUser().getId())
-                .username(isSender ? userFriend.getFriend().getUsername() : userFriend.getUser().getUsername())
-                .publicId(isSender ? userFriend.getFriend().getPublicId() : userFriend.getUser().getPublicId())
-                .avatarUrl(isSender ? userFriend.getFriend().getAvatarUrl() : userFriend.getUser().getAvatarUrl())
+                .user(UserDTO.fromEntity(userFriend.getUser()))
+                .friend(UserDTO.fromEntity(userFriend.getFriend()))
                 .status(userFriend.getStatus())
                 .createdAt(userFriend.getCreatedAt())
                 .build();

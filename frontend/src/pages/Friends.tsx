@@ -20,18 +20,27 @@ import {
 } from '@ant-design/icons';
 import { friendApi, userApi } from '../api';
 import type { Friend, User } from '../types';
+import { useAuthStore } from '../store/useAuthStore';
 import dayjs from 'dayjs';
 import './Friends.scss';
 
 const { Search } = Input;
 
 const Friends: React.FC = () => {
+  const currentUser = useAuthStore((state) => state.user);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<Friend[]>([]);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
+
+  // 辅助函数：从好友关系中获取"对方"的用户信息
+  const getOtherUser = (friend: Friend): User | undefined => {
+    if (!currentUser) return undefined;
+    // 如果当前用户是发起者(user)，返回friend；否则返回user
+    return friend.user?.id === currentUser.id ? friend.friend : friend.user;
+  };
 
   useEffect(() => {
     fetchFriends();
@@ -130,26 +139,29 @@ const Friends: React.FC = () => {
           loading={loading}
           dataSource={friends}
           locale={{ emptyText: <Empty description="暂无好友" /> }}
-          renderItem={(friend) => (
-            <List.Item
-              actions={[
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDeleteFriend(friend.friend!.id)}
-                >
-                  删除
-                </Button>,
-              ]}
-            >
-              <List.Item.Meta
-                avatar={<Avatar src={friend.friend?.avatarUrl} icon={<UserOutlined />} />}
-                title={friend.friend?.username}
-                description={friend.friend?.email}
-              />
-            </List.Item>
-          )}
+          renderItem={(friend) => {
+            const otherUser = getOtherUser(friend);
+            return (
+              <List.Item
+                actions={[
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDeleteFriend(otherUser?.id!)}
+                  >
+                    删除
+                  </Button>,
+                ]}
+              >
+                <List.Item.Meta
+                  avatar={<Avatar src={otherUser?.avatarUrl} icon={<UserOutlined />} />}
+                  title={otherUser?.username}
+                  description={otherUser?.email}
+                />
+              </List.Item>
+            );
+          }}
         />
       ),
     },
