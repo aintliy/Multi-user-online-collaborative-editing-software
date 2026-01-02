@@ -50,7 +50,9 @@ import lombok.extern.slf4j.Slf4j;
 public class DocumentService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
-    private static final String STATUS_DELETED = "deleted";
+    private static final String STATUS_DELETED = "DELETED";
+    private static final String STATUS_PUBLIC = "PUBLIC";
+    private static final String STATUS_PRIVATE = "PRIVATE";
     
     private final DocumentRepository documentRepository;
     private final DocumentFolderRepository folderRepository;
@@ -75,8 +77,8 @@ public class DocumentService {
         Document document = Document.builder()
                 .title(request.getTitle())
                 .owner(owner)
-            .docType(normalizeDocType(request.getDocType()))
-                .visibility(request.getVisibility() != null ? request.getVisibility() : "private")
+                .docType(normalizeDocType(request.getDocType()))
+                .visibility(request.getVisibility() != null ? request.getVisibility() : STATUS_PRIVATE)
                 .folder(folder)
                 .content("")
                 .storagePath(storagePath)
@@ -132,6 +134,8 @@ public class DocumentService {
             document.setTags(request.getTags());
         }
         
+        
+
         document = documentRepository.save(document);
         return DocumentDTO.fromEntity(document, userId, true);
     }
@@ -274,7 +278,7 @@ public class DocumentService {
 
         document.setFolder(null);
         document.setStatus(STATUS_DELETED);
-        document.setVisibility("private");
+        document.setVisibility(STATUS_PRIVATE);
         documentRepository.save(document);
 
         // 清理协作缓存（confirmed/draft/online）
@@ -320,7 +324,7 @@ public class DocumentService {
         if (keyword != null && !keyword.isEmpty()) {
             documentPage = documentRepository.searchPublicDocuments(keyword, pageable);
         } else {
-            documentPage = documentRepository.findByVisibilityAndStatusNot("public", STATUS_DELETED, pageable);
+            documentPage = documentRepository.findByVisibilityAndStatusNot(STATUS_PUBLIC, STATUS_DELETED, pageable);
         }
         
         List<DocumentDTO> items = documentPage.getContent().stream()
@@ -452,8 +456,8 @@ public class DocumentService {
                 .title(sourceDocument.getTitle() + " (克隆)")
                 .owner(owner)
                 .content(sourceDocument.getContent())
-            .docType(normalizeDocType(sourceDocument.getDocType()))
-                .visibility("private")
+                .docType(normalizeDocType(sourceDocument.getDocType()))
+                .visibility(STATUS_PRIVATE)
                 .tags(sourceDocument.getTags())
                 .folder(folder)
                 .storagePath(storagePath)
@@ -513,7 +517,7 @@ public class DocumentService {
                 .owner(owner)
                 .content(content)
                 .docType(docType)
-                .visibility("private")
+                .visibility(STATUS_PRIVATE)
                 .folder(folder)
                 .storagePath(storagePath)
                 .status(STATUS_ACTIVE)
@@ -580,7 +584,7 @@ public class DocumentService {
     }
 
     private boolean isFolderDeleted(DocumentFolder folder) {
-        return folder == null || "deleted".equalsIgnoreCase(folder.getStatus());
+        return folder == null || STATUS_DELETED.equalsIgnoreCase(folder.getStatus());
     }
 
     private DocumentFolder resolveFolder(Long userId, Long folderId) {
@@ -612,7 +616,7 @@ public class DocumentService {
         if (!legacyRoots.isEmpty()) {
             DocumentFolder root = legacyRoots.get(0);
             if (root.getStatus() == null) {
-                root.setStatus("ACTIVE");
+                root.setStatus(STATUS_ACTIVE);
             }
             return folderRepository.save(root);
         }
@@ -622,7 +626,7 @@ public class DocumentService {
                 .owner(owner)
                 .name("根目录")
                 .parent(null)
-                .status("ACTIVE")
+                .status(STATUS_ACTIVE)
                 .build();
         return folderRepository.save(root);
     }
@@ -710,7 +714,7 @@ public class DocumentService {
             return true;
         }
         // 公开文档任何人可访问
-        if ("public".equals(document.getVisibility())) {
+        if (STATUS_PUBLIC.equalsIgnoreCase(document.getVisibility())) {
             return true;
         }
         // 协作者可访问
@@ -768,7 +772,7 @@ public class DocumentService {
      * 获取用户的公开文档列表
      */
     public List<DocumentDTO> getUserPublicDocuments(Long userId, Long currentUserId) {
-        return documentRepository.findByOwnerIdAndVisibilityAndStatus(userId, "public", "ACTIVE")
+        return documentRepository.findByOwnerIdAndVisibilityAndStatus(userId, STATUS_PUBLIC, STATUS_ACTIVE)
                 .stream()
                 .map(doc -> DocumentDTO.fromEntity(doc, currentUserId, false))  // 公开文档默认不可编辑
                 .collect(java.util.stream.Collectors.toList());

@@ -55,6 +55,8 @@ public class AuthService {
     private static final int VERIFICATION_CODE_EXPIRE = 300; // 5分钟
     private static final int PASSWORD_RESET_EXPIRE = 300; // 5分钟
 
+    private static final String STATUS_ACTIVE = "ACTIVE";
+
     @Value("${spring.mail.username}")
     private String from;
     
@@ -120,7 +122,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role("USER")
-                .status("ACTIVE")
+                .status(STATUS_ACTIVE)
                 .build();
         
         user = userRepository.save(user);

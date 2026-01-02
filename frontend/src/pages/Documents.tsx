@@ -364,19 +364,28 @@ const Documents: React.FC = () => {
       key: 'edit',
       icon: <FileTextOutlined />,
       label: '打开',
-      onClick: () => navigate(`/documents/${doc.id}`),
+      onClick: (e: any) => {
+        e?.domEvent?.stopPropagation();
+        navigate(`/documents/${doc.id}`);
+      },
     },
     {
       key: 'rename',
       icon: <EditOutlined />,
       label: '重命名',
-      onClick: () => openRenameModal(doc),
+      onClick: (e: any) => {
+        e?.domEvent?.stopPropagation();
+        openRenameModal(doc);
+      },
     },
     {
       key: 'clone',
       icon: <CopyOutlined />,
       label: '克隆',
-      onClick: () => handleCloneDocument(doc),
+      onClick: (e: any) => {
+        e?.domEvent?.stopPropagation();
+        handleCloneDocument(doc);
+      },
     },
     {
       type: 'divider' as const,
@@ -386,7 +395,10 @@ const Documents: React.FC = () => {
       icon: <DeleteOutlined />,
       label: '删除',
       danger: true,
-      onClick: () => handleDeleteDocument(doc),
+      onClick: (e: any) => {
+        e?.domEvent?.stopPropagation();
+        handleDeleteDocument(doc);
+      },
     },
   ];
 

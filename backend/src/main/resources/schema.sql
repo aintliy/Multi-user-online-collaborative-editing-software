@@ -33,7 +33,7 @@ CREATE TABLE users (
   password     VARCHAR(255) NOT NULL,
   avatar_url   VARCHAR(255),
   profile      TEXT,
-  status       VARCHAR(20)  DEFAULT 'active',       -- active / disabled
+  status       VARCHAR(20)  DEFAULT 'ACTIVE',       -- ACTIVE / DISABLED
   role         VARCHAR(20)  DEFAULT 'USER',         -- ADMIN / USER（系统角色）
   created_at   TIMESTAMP  DEFAULT NOW(),
   updated_at   TIMESTAMP  DEFAULT NOW()
@@ -46,7 +46,7 @@ CREATE INDEX idx_users_public_id ON users(public_id);
 COMMENT ON TABLE users IS '用户表';
 COMMENT ON COLUMN users.public_id IS '对外展示的随机不可变用户ID';
 COMMENT ON COLUMN users.role IS '系统角色: ADMIN-管理员, USER-普通用户';
-COMMENT ON COLUMN users.status IS '用户状态: active-正常, disabled-已禁用';
+COMMENT ON COLUMN users.status IS '用户状态: ACTIVE-正常, DISABLED-已禁用';
 
 -- =====================================================
 -- 2. 文档文件夹表 (document_folders)
@@ -56,7 +56,7 @@ CREATE TABLE document_folders (
   owner_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name         VARCHAR(255) NOT NULL,
   parent_id    BIGINT REFERENCES document_folders(id) ON DELETE CASCADE,
-  status       VARCHAR(20) DEFAULT 'active',
+  status       VARCHAR(20) DEFAULT 'ACTIVE',
   created_at   TIMESTAMP DEFAULT NOW(),
   updated_at   TIMESTAMP DEFAULT NOW(),
   CONSTRAINT uq_folder_name_per_parent UNIQUE (owner_id, parent_id, name)
@@ -77,14 +77,14 @@ CREATE TABLE documents (
   owner_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content        TEXT,
   doc_type       VARCHAR(20) DEFAULT 'markdown',
-  visibility     VARCHAR(20) DEFAULT 'private',
+  visibility     VARCHAR(20) DEFAULT 'PRIVATE',  -- PRIVATE-私有, PUBLIC-公开
   tags           VARCHAR(255),
   folder_id      BIGINT REFERENCES document_folders(id) ON DELETE SET NULL,
-  status         VARCHAR(20) DEFAULT 'active',
+  status         VARCHAR(20) DEFAULT 'ACTIVE',
   forked_from_id BIGINT REFERENCES documents(id),
   storage_path   VARCHAR(512),
   created_at     TIMESTAMP DEFAULT NOW(),
-  updated_at     TIMESTAMP DEFAULT NOW()
+  updated_at     TIMESTAMP DEFAULT NOW(),
 );
 
 CREATE INDEX idx_documents_owner ON documents(owner_id);
@@ -94,8 +94,8 @@ CREATE INDEX idx_documents_folder ON documents(folder_id);
 CREATE INDEX idx_documents_status ON documents(status);
 
 COMMENT ON TABLE documents IS '文档表';
-COMMENT ON COLUMN documents.doc_type IS '文档类型: markdown / docx / txt / sheet / slide';
-COMMENT ON COLUMN documents.visibility IS '可见性: private-私有, public-公开';
+COMMENT ON COLUMN documents.doc_type IS '文档类型: markdown / txt';
+COMMENT ON COLUMN documents.visibility IS '可见性: PRIVATE-私有, PUBLIC-公开';
 COMMENT ON COLUMN documents.folder_id IS '所属文件夹ID';
 COMMENT ON COLUMN documents.forked_from_id IS '克隆来源文档ID';
 COMMENT ON COLUMN documents.storage_path IS '物理文件存储相对路径，格式: {ownerId}/{folderId}/';
