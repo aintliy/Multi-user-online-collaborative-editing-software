@@ -117,4 +117,13 @@ export const download = async (url: string, filename: string): Promise<void> => 
   URL.revokeObjectURL(link.href);
 };
 
+/**
+ * 处理头像URL，将相对路径转换为完整URL
+ */
+export const getAvatarUrl = (avatarUrl?: string | null): string | undefined => {
+  if (!avatarUrl) return undefined;
+  if (avatarUrl.startsWith('http')) return avatarUrl;
+  return `http://localhost:8080${avatarUrl}`;
+};
+
 export default request;

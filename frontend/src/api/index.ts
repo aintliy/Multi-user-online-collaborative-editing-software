@@ -13,6 +13,8 @@ import type {
   Collaborator,
   WorkspaceRequest,
   Friend,
+  FriendMessage,
+  ShareLink,
   Comment,
   Notification,
   ChatMessage,
@@ -63,6 +65,10 @@ export const userApi = {
   // 获取用户公开仓库
   getUserRepos: (publicId: string) =>
     get<User>(`/users/${publicId}/repos`),
+  
+  // 获取用户公开文档列表
+  getUserPublicDocs: (publicId: string) =>
+    get<{ user: User; documents: Document[] }>(`/users/${publicId}/public-documents`),
 };
 
 // ========== 文档相关 API ==========
@@ -149,6 +155,18 @@ export const documentApi = {
   exportPdf: (id: number) => `/documents/${id}/export/pdf`,
   exportTxt: (id: number) => `/documents/${id}/export/txt`,
   exportMd: (id: number) => `/documents/${id}/export/md`,
+
+  // 创建分享链接
+  createShareLink: (id: number) =>
+    post<ShareLink>(`/documents/${id}/share-links`),
+  
+  // 使用分享链接
+  useShareLink: (token: string) =>
+    post<{ documentId: number }>(`/documents/share-links/${token}/use`),
+  
+  // 获取分享链接信息
+  getShareLinkInfo: (token: string) =>
+    get<ShareLink>(`/documents/share-links/${token}`),
 };
 
 // ========== 文件夹相关 API ==========
@@ -183,6 +201,10 @@ export const collaboratorApi = {
   // 移除协作者
   remove: (documentId: number, userId: number) =>
     del<void>(`/documents/${documentId}/collaborators/${userId}`),
+  
+  // 获取当前用户所有文档的待处理协作申请
+  getMyPendingRequests: () =>
+    get<WorkspaceRequest[]>('/workspace-requests/pending'),
   
   // 提交协作申请
   submitRequest: (documentId: number, data?: { message?: string }) =>
@@ -234,6 +256,26 @@ export const friendApi = {
   // 删除好友
   delete: (friendUserId: number) =>
     del<void>(`/friends/${friendUserId}`),
+  
+  // 发送消息给好友
+  sendMessage: (receiverId: number, content: string, messageType?: string, shareLinkId?: number) =>
+    post<FriendMessage>('/friends/messages', { receiverId, content, messageType, shareLinkId }),
+  
+  // 获取与某好友的聊天记录
+  getMessages: (friendId: number) =>
+    get<FriendMessage[]>(`/friends/${friendId}/messages`),
+  
+  // 分页获取聊天记录
+  getMessagesPaged: (friendId: number, page?: number, pageSize?: number) =>
+    get<PageResponse<FriendMessage>>(`/friends/${friendId}/messages/paged`, { params: { page, pageSize } }),
+  
+  // 标记消息为已读
+  markAsRead: (friendId: number) =>
+    post<void>(`/friends/${friendId}/messages/read`),
+  
+  // 获取未读消息数量
+  getUnreadCount: () =>
+    get<{ count: number }>('/friends/messages/unread-count'),
 };
 
 // ========== 评论相关 API ==========

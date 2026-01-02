@@ -6,13 +6,15 @@ import com.example.backend.exception.BusinessException;
 import com.example.backend.exception.ErrorCode;
 import com.example.backend.repository.*;
 import com.example.backend.util.IdGenerator;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 协作服务
@@ -29,19 +31,30 @@ public class CollaboratorService {
     private final NotificationService notificationService;
     
     /**
-     * 获取文档协作者列表
+     * 获取文档协作者列表（包含所有者）
      */
     public List<CollaboratorDTO> getCollaborators(Long documentId, Long userId) {
         Document document = getDocumentById(documentId);
         
-        // 只有所有者可以查看协作者列表
-        if (!document.getOwner().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以查看协作者列表");
-        }
+        // // 只有所有者或协作者可以查看协作者列表
+        // boolean isOwner = document.getOwner().getId().equals(userId);
+        // boolean isCollaborator = collaboratorRepository.existsByDocumentIdAndUserId(documentId, userId);
         
-        return collaboratorRepository.findByDocumentId(documentId).stream()
+        // if (!isOwner && !isCollaborator) {
+        //     throw new BusinessException(ErrorCode.FORBIDDEN, "只有所有者或协作者可以查看协作者列表");
+        // }
+        
+        List<CollaboratorDTO> result = new ArrayList<>();
+        
+        // 添加所有者
+        result.add(CollaboratorDTO.fromOwner(document));
+        
+        // 添加协作者
+        collaboratorRepository.findByDocumentId(documentId).stream()
                 .map(CollaboratorDTO::fromEntity)
-                .collect(Collectors.toList());
+                .forEach(result::add);
+        
+        return result;
     }
     
     /**
@@ -161,18 +174,32 @@ public class CollaboratorService {
         );
     }
     
+    // /**
+    //  * 获取协作申请列表
+    //  */
+    // public List<DocumentWorkspaceRequest> getWorkspaceRequests(Long documentId, Long userId) {
+    //     Document document = getDocumentById(documentId);
+        
+    //     // 只有所有者可以查看申请列表
+    //     if (!document.getOwner().getId().equals(userId)) {
+    //         throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以查看协作申请");
+    //     }
+        
+    //     return workspaceRequestRepository.findByDocumentIdAndStatus(documentId, "PENDING");
+    // }
+    
     /**
-     * 获取协作申请列表
+     * 获取用户拥有的所有文档的待处理协作申请
      */
-    public List<DocumentWorkspaceRequest> getWorkspaceRequests(Long documentId, Long userId) {
-        Document document = getDocumentById(documentId);
+    public List<WorkspaceRequestDTO> getMyWorkspaceRequests(Long userId) {
         
-        // 只有所有者可以查看申请列表
-        if (!document.getOwner().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以查看协作申请");
-        }
-        
-        return workspaceRequestRepository.findByDocumentIdAndStatus(documentId, "PENDING");
+        List<WorkspaceRequestDTO> result = new ArrayList<>();
+
+        workspaceRequestRepository.findByDocumentOwnerIdAndStatus(userId, "PENDING").stream()
+                .map(WorkspaceRequestDTO::fromEntity)
+                .forEach(result::add);
+
+        return result;
     }
     
     /**

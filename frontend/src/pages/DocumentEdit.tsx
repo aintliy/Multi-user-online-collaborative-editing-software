@@ -18,6 +18,7 @@ import {
   Badge,
   Tabs,
   Spin,
+  Typography,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -28,18 +29,23 @@ import {
   CommentOutlined,
   MessageOutlined,
   UserOutlined,
+  ShareAltOutlined,
+  CopyOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import { documentApi, collaboratorApi, commentApi, chatApi, userApi } from '../api';
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentStore } from '../store/useDocumentStore';
 import wsService from '../utils/websocket';
-import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User } from '../types';
+import { getAvatarUrl } from '../utils/request';
+import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User, ShareLink } from '../types';
 import dayjs from 'dayjs';
 import './DocumentEdit.scss';
  
 const { Header, Sider, Content } = Layout;
 const { TextArea } = Input;
+const { Paragraph } = Typography;
 
 // 映射文档类型到编辑器语言
 const getEditorLanguage = (docType: string): string => {
@@ -84,7 +90,11 @@ const DocumentEdit: React.FC = () => {
   // Modals
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [addCollaboratorModalOpen, setAddCollaboratorModalOpen] = useState(false);
+  const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
+  const [collaboratorInfoModalOpen, setCollaboratorInfoModalOpen] = useState(false);
   const [searchUsers, setSearchUsers] = useState<User[]>([]);
+  const [currentShareLink, setCurrentShareLink] = useState<ShareLink | null>(null);
+  const [generatingShareLink, setGeneratingShareLink] = useState(false);
   const ttlTimerRef = useRef<number | null>(null);
   
   const [form] = Form.useForm();
@@ -93,6 +103,7 @@ const DocumentEdit: React.FC = () => {
   const documentId = parseInt(id!);
   const isAdmin = user?.role === 'ADMIN';
   const isPreviewMode = document ? document.canEdit === false : false;
+  const isOwner = document?.isOwner === true;
 
   useEffect(() => {
     fetchDocument();
@@ -437,6 +448,26 @@ const DocumentEdit: React.FC = () => {
     setNewMessage('');
   };
 
+  const handleGenerateShareLink = async () => {
+    setGeneratingShareLink(true);
+    try {
+      const shareLink = await documentApi.createShareLink(documentId);
+      setCurrentShareLink(shareLink);
+      setShareLinkModalOpen(true);
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '生成分享链接失败');
+    } finally {
+      setGeneratingShareLink(false);
+    }
+  };
+
+  const handleCopyShareLink = () => {
+    if (currentShareLink) {
+      navigator.clipboard.writeText(currentShareLink.token);
+      message.success('分享链接已复制，请在好友聊天中发送');
+    }
+  };
+
   const handleAddComment = async (content: string) => {
     try {
       await commentApi.create(documentId, { content });
@@ -496,7 +527,7 @@ const DocumentEdit: React.FC = () => {
               <Tooltip key={u.id} title={u.username}>
                 <Avatar
                   size="small"
-                  src={u.avatarUrl || undefined}
+                  src={getAvatarUrl(u.avatarUrl)}
                   icon={<UserOutlined />}
                   style={{ backgroundColor: `hsl(${u.id * 30 % 360}, 70%, 50%)` }}
                 />
@@ -516,30 +547,51 @@ const DocumentEdit: React.FC = () => {
                 <Button onClick={() => setCommitModalOpen(true)}>
                   提交版本
                 </Button>
+                {isOwner && (
+                  <Button
+                    icon={<ShareAltOutlined />}
+                    onClick={handleGenerateShareLink}
+                    loading={generatingShareLink}
+                  >
+                    分享
+                  </Button>
+                )}
               </>
             )}
-            <Dropdown menu={{ items: exportMenuItems }}>
-              <Button icon={<DownloadOutlined />}>导出</Button>
-            </Dropdown>
-            <Button
-              icon={<HistoryOutlined />}
-              onClick={() => {
-                fetchVersions();
-                setHistoryDrawerOpen(true);
-              }}
-            />
-            {!isPreviewMode && (
+            {isPreviewMode ? (
               <Button
-                icon={<TeamOutlined />}
-                onClick={() => setCollaboratorsDrawerOpen(true)}
-              />
+                icon={<InfoCircleOutlined />}
+                onClick={() => {
+                  fetchCollaborators();
+                  setCollaboratorInfoModalOpen(true);
+                }}
+              >
+                协作者信息
+              </Button>
+            ) : (
+              <>
+                <Dropdown menu={{ items: exportMenuItems }}>
+                  <Button icon={<DownloadOutlined />}>导出</Button>
+                </Dropdown>
+                <Button
+                  icon={<HistoryOutlined />}
+                  onClick={() => {
+                    fetchVersions();
+                    setHistoryDrawerOpen(true);
+                  }}
+                />
+                <Button
+                  icon={<TeamOutlined />}
+                  onClick={() => setCollaboratorsDrawerOpen(true)}
+                />
+                <Badge count={comments.length}>
+                  <Button
+                    icon={<CommentOutlined />}
+                    onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                  />
+                </Badge>
+              </>
             )}
-            <Badge count={comments.length}>
-              <Button
-                icon={<CommentOutlined />}
-                onClick={() => setRightPanelOpen(!rightPanelOpen)}
-              />
-            </Badge>
           </Space>
         </div>
       </Header>
@@ -592,7 +644,7 @@ const DocumentEdit: React.FC = () => {
                         renderItem={(comment) => (
                           <List.Item>
                             <List.Item.Meta
-                              avatar={<Avatar src={comment.user?.avatarUrl || undefined} icon={<UserOutlined />} />}
+                              avatar={<Avatar src={getAvatarUrl(comment.user?.avatarUrl)} icon={<UserOutlined />} />}
                               title={comment.user?.username}
                               description={
                                 <>
@@ -633,7 +685,7 @@ const DocumentEdit: React.FC = () => {
                             key={index}
                             className={`chat-message ${msg.user?.id === user?.id ? 'own' : ''}`}
                           >
-                            <Avatar size="small" src={msg.user?.avatarUrl || undefined} icon={<UserOutlined />} />
+                            <Avatar size="small" src={getAvatarUrl(msg.user?.avatarUrl)} icon={<UserOutlined />} />
                             <div className="message-content">
                               <div className="message-user">{msg.user?.username}</div>
                               <div className="message-text">{msg.content}</div>
@@ -682,17 +734,21 @@ const DocumentEdit: React.FC = () => {
         title="版本历史"
         open={historyDrawerOpen}
         onClose={() => setHistoryDrawerOpen(false)}
-        width={400}
+        size={400}
       >
         <List
           dataSource={versions}
           renderItem={(version) => (
             <List.Item
-              actions={[
-                <Button size="small" onClick={() => handleRollback(version.id)}>
-                  回滚
-                </Button>,
-              ]}
+              actions={
+                isOwner
+                  ? [
+                      <Button size="small" onClick={() => handleRollback(version.id)}>
+                        回滚
+                      </Button>,
+                    ]
+                  : []
+              }
             >
               <List.Item.Meta
                 title={version.commitMessage || `版本 ${version.versionNo}`}
@@ -714,36 +770,43 @@ const DocumentEdit: React.FC = () => {
         title="协作者管理"
         open={collaboratorsDrawerOpen}
         onClose={() => setCollaboratorsDrawerOpen(false)}
-        width={400}
+        size={400}
         extra={
-          <Button type="primary" onClick={() => setAddCollaboratorModalOpen(true)}>
-            添加协作者
-          </Button>
+          isOwner && (
+            <Button type="primary" onClick={() => setAddCollaboratorModalOpen(true)}>
+              添加协作者
+            </Button>
+          )
         }
       >
         <List
           dataSource={collaborators}
           renderItem={(collaborator) => (
             <List.Item
-              actions={[
-                collaborator.user?.id !== document?.ownerId && (
-                  <Button
-                    danger
-                    size="small"
-                    onClick={() => handleRemoveCollaborator(collaborator.user!.id)}
-                  >
-                    移除
-                  </Button>
-                ),
-              ]}
+              actions={
+                isOwner && collaborator.role !== 'OWNER'
+                  ? [
+                      <Button
+                        danger
+                        size="small"
+                        onClick={() => handleRemoveCollaborator(collaborator.user!.id)}
+                      >
+                        移除
+                      </Button>,
+                    ]
+                  : []
+              }
             >
               <List.Item.Meta
-                avatar={<Avatar src={collaborator.user?.avatarUrl || undefined} icon={<UserOutlined />} />}
+                avatar={<Avatar src={getAvatarUrl(collaborator.user?.avatarUrl)} icon={<UserOutlined />} />}
                 title={
                   <Space>
                     {collaborator.user?.username}
-                    {collaborator.user?.id === document?.ownerId && (
+                    {collaborator.role === 'OWNER' && (
                       <Tag color="gold">所有者</Tag>
+                    )}
+                    {collaborator.role === 'EDITOR' && (
+                      <Tag color="blue">协作者</Tag>
                     )}
                   </Space>
                 }
@@ -778,7 +841,7 @@ const DocumentEdit: React.FC = () => {
               {searchUsers.map((u) => (
                 <Select.Option key={u.id} value={u.id}>
                   <Space>
-                    <Avatar size="small" src={u.avatarUrl || undefined} icon={<UserOutlined />} />
+                    <Avatar size="small" src={getAvatarUrl(u.avatarUrl)} icon={<UserOutlined />} />
                     {u.username}
                   </Space>
                 </Select.Option>
@@ -786,6 +849,83 @@ const DocumentEdit: React.FC = () => {
             </Select>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Share Link Modal */}
+      <Modal
+        title="分享文档"
+        open={shareLinkModalOpen}
+        onCancel={() => {
+          setShareLinkModalOpen(false);
+          setCurrentShareLink(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setShareLinkModalOpen(false)}>
+            关闭
+          </Button>,
+          <Button
+            key="copy"
+            type="primary"
+            icon={<CopyOutlined />}
+            onClick={handleCopyShareLink}
+          >
+            复制链接
+          </Button>,
+        ]}
+      >
+        {currentShareLink && (
+          <div className="share-link-content">
+            <p>已生成一次性分享链接，该链接仅可使用一次。</p>
+            <p>请将以下链接复制到<strong>好友聊天</strong>中发送给好友：</p>
+            <Paragraph
+              copyable={{
+                text: currentShareLink.token,
+                tooltips: ['复制', '已复制'],
+              }}
+              className="share-token"
+            >
+              {currentShareLink.token}
+            </Paragraph>
+            <p className="share-notice">
+              ⚠️ 注意：此链接仅可在好友聊天窗口中使用，好友点击后将成为此文档的协作者。
+            </p>
+            {currentShareLink.expiresAt && (
+              <p className="share-expire">
+                有效期至: {dayjs(currentShareLink.expiresAt).format('YYYY-MM-DD HH:mm')}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Collaborator Info Modal (for preview mode) */}
+      <Modal
+        title="协作者信息"
+        open={collaboratorInfoModalOpen}
+        onCancel={() => setCollaboratorInfoModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setCollaboratorInfoModalOpen(false)}>
+            关闭
+          </Button>,
+        ]}
+      >
+        <List
+          dataSource={collaborators}
+          renderItem={(collaborator) => (
+            <List.Item>
+              <List.Item.Meta
+                avatar={<Avatar src={getAvatarUrl(collaborator.user?.avatarUrl)} icon={<UserOutlined />} />}
+                title={
+                  <Space>
+                    {collaborator.user?.username}
+                    {collaborator.role === 'OWNER' && <Tag color="gold">所有者</Tag>}
+                    {collaborator.role === 'EDITOR' && <Tag color="blue">协作者</Tag>}
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
       </Modal>
     </Layout>
   );

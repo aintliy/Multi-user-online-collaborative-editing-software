@@ -5,7 +5,6 @@ import com.example.backend.dto.PageResponse;
 import com.example.backend.dto.auth.UserDTO;
 import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.entity.OperationLog;
-import com.example.backend.entity.User;
 import com.example.backend.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;

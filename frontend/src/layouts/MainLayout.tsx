@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
@@ -7,7 +7,9 @@ import {
   Dropdown,
   Badge,
   Space,
+  Button,
   message,
+  notification,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -17,10 +19,12 @@ import {
   LogoutOutlined,
   SettingOutlined,
   GlobalOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { notificationApi } from '../api';
 import wsService from '../utils/websocket';
+import { getAvatarUrl } from '../utils/request';
 import './MainLayout.scss';
 
 const { Header, Sider, Content } = Layout;
@@ -31,13 +35,20 @@ const MainLayout: React.FC = () => {
   const { user, token, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessageMap, setUnreadMessageMap] = useState<Map<number, number>>(new Map()); // 按好友ID追踪未读数
 
   useEffect(() => {
     // 连接 WebSocket
     if (token) {
       wsService.connect(token).then(() => {
-        wsService.subscribeToNotifications(user!.id, () => {
-          fetchUnreadCount();
+        wsService.subscribeToNotifications(user!.id, (data: any) => {
+          // 处理好友消息通知
+          if (data.type === 'FRIEND_MESSAGE') {
+            handleFriendMessageNotification(data);
+          } else {
+            // 其他通知刷新未读数
+            fetchUnreadCount();
+          }
         });
       }).catch((err) => {
         console.error('WebSocket connection failed:', err);
@@ -49,13 +60,100 @@ const MainLayout: React.FC = () => {
     };
   }, [token]);
 
+  // 打开好友聊天
+  const openFriendChat = useCallback((senderId: number, senderName: string, senderAvatar: string) => {
+    // 清除该好友的未读消息
+    setUnreadMessageMap(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(senderId);
+      return newMap;
+    });
+    
+    // 导航到好友页面并触发打开聊天事件
+    navigate('/friends');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-friend-chat', { 
+        detail: { 
+          friendId: senderId, 
+          friendName: senderName, 
+          friendAvatar: senderAvatar 
+        } 
+      }));
+    }, 100);
+    notification.destroy();
+  }, [navigate]);
+
+  // 处理好友消息实时通知
+  const handleFriendMessageNotification = useCallback((data: any) => {
+    const senderId = data.senderId;
+    
+    // 更新该好友的未读消息数
+    setUnreadMessageMap(prev => {
+      const newMap = new Map(prev);
+      newMap.set(senderId, (newMap.get(senderId) || 0) + 1);
+      return newMap;
+    });
+    
+    const messageContent = data.message?.messageType === 'SHARE_LINK' 
+      ? '分享了一个文档给你' 
+      : data.message?.content?.substring(0, 50) || '发来一条消息';
+    
+    const key = `friend-msg-${senderId}-${Date.now()}`;
+    
+    notification.info({
+      key,
+      message: `来自 ${data.senderName} 的消息`,
+      description: (
+        <div>
+          <div style={{ marginBottom: 8 }}>{messageContent}</div>
+          <Button 
+            type="primary" 
+            size="small"
+            icon={<MessageOutlined />}
+            onClick={() => openFriendChat(senderId, data.senderName, data.senderAvatar)}
+          >
+            打开聊天
+          </Button>
+        </div>
+      ),
+      icon: <Avatar size="small" src={getAvatarUrl(data.senderAvatar)} icon={<UserOutlined />} />,
+      placement: 'topRight',
+      duration: 6,
+    });
+
+    // 触发事件，让 Friends 页面可以刷新消息
+    window.dispatchEvent(new CustomEvent('friend-message-received', { detail: data }));
+  }, [openFriendChat]);
+
   useEffect(() => {
     fetchUnreadCount();
 
     const handleLocalRead = () => fetchUnreadCount();
     window.addEventListener('notification-read', handleLocalRead);
-    return () => window.removeEventListener('notification-read', handleLocalRead);
+
+    // 监听好友消息已查看事件（传入friendId清除特定好友，不传则清除全部）
+    const handleFriendMessagesViewed = (event: CustomEvent) => {
+      const friendId = event.detail?.friendId;
+      if (friendId) {
+        setUnreadMessageMap(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(friendId);
+          return newMap;
+        });
+      } else {
+        setUnreadMessageMap(new Map());
+      }
+    };
+    window.addEventListener('friend-messages-viewed', handleFriendMessagesViewed as EventListener);
+
+    return () => {
+      window.removeEventListener('notification-read', handleLocalRead);
+      window.removeEventListener('friend-messages-viewed', handleFriendMessagesViewed as EventListener);
+    };
   }, []);
+
+  // 计算总未读消息数
+  const totalUnreadMessageCount = Array.from(unreadMessageMap.values()).reduce((a, b) => a + b, 0);
 
   const fetchUnreadCount = async () => {
     try {
@@ -85,7 +183,7 @@ const MainLayout: React.FC = () => {
     },
     {
       key: '/friends',
-      icon: <TeamOutlined />,
+      icon: <Badge count={totalUnreadMessageCount} size="small"><TeamOutlined /></Badge>,
       label: '好友',
     },
     {
@@ -152,7 +250,7 @@ const MainLayout: React.FC = () => {
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <Space className="user-info" style={{ cursor: 'pointer' }}>
                   <Avatar 
-                    src={user?.avatarUrl ? (user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:8080${user.avatarUrl}`) : undefined} 
+                    src={getAvatarUrl(user?.avatarUrl)} 
                     icon={<UserOutlined />} 
                   />
                   <span className="username">{user?.username}</span>

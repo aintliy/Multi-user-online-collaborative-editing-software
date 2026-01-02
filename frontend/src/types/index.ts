@@ -102,6 +102,11 @@ export interface Collaborator {
 export interface WorkspaceRequest {
   id: number;
   user?: User;
+  applicant?: User;
+  document?: {
+    id: number;
+    title: string;
+  };
   documentId: number;
   message?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -114,6 +119,36 @@ export interface Friend {
   user?: User;
   friend?: User;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  createdAt: string;
+}
+
+// 好友消息类型
+export interface FriendMessage {
+  id: number;
+  sender?: User;
+  receiver?: User;
+  content: string;
+  messageType: 'TEXT' | 'SHARE_LINK';
+  shareLinkId?: number;
+  shareLinkInfo?: {
+    documentId: number;
+    documentTitle: string;
+    isUsed: boolean;
+    isExpired: boolean;
+  };
+  isRead: boolean;
+  createdAt: string;
+}
+
+// 文档分享链接类型
+export interface ShareLink {
+  id: number;
+  documentId: number;
+  documentTitle: string;
+  token: string;
+  shareUrl: string;
+  isUsed: boolean;
+  expiresAt: string;
   createdAt: string;
 }
 

@@ -2,8 +2,10 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.ApiResponse;
 import com.example.backend.dto.auth.UserDTO;
+import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.entity.User;
 import com.example.backend.service.AuthService;
+import com.example.backend.service.DocumentService;
 import com.example.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +33,7 @@ public class UserController {
     
     private final UserService userService;
     private final AuthService authService;
+    private final DocumentService documentService;
     
     @Value("${file.avatar-dir:./uploads/avatars}")
     private String avatarDir;
@@ -86,5 +89,27 @@ public class UserController {
     public ApiResponse<UserDTO> getUserRepos(@PathVariable String publicId) {
         User user = userService.getUserByPublicId(publicId);
         return ApiResponse.success(UserDTO.fromEntity(user));
+    }
+    
+    /**
+     * 获取用户公开文档列表
+     */
+    @GetMapping("/{publicId}/public-documents")
+    public ApiResponse<Map<String, Object>> getUserPublicDocuments(
+            @PathVariable String publicId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User targetUser = userService.getUserByPublicId(publicId);
+        Long currentUserId = null;
+        if (userDetails != null) {
+            User currentUser = userService.getUserByEmail(userDetails.getUsername());
+            if (currentUser != null) {
+                currentUserId = currentUser.getId();
+            }
+        }
+        List<DocumentDTO> documents = documentService.getUserPublicDocuments(targetUser.getId(), currentUserId);
+        return ApiResponse.success(Map.of(
+                "user", UserDTO.fromEntity(targetUser),
+                "documents", documents
+        ));
     }
 }

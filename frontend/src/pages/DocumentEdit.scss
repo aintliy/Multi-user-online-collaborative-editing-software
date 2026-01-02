@@ -183,3 +183,27 @@
   font-size: 16px;
   color: #999;
 }
+
+// 分享链接样式
+.share-link-content {
+  .share-token {
+    background: #f5f5f5;
+    padding: 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    word-break: break-all;
+    margin: 12px 0;
+  }
+
+  .share-notice {
+    color: #faad14;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  .share-expire {
+    color: #999;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+}

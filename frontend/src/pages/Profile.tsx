@@ -4,6 +4,7 @@ import { UserOutlined, UploadOutlined, MailOutlined, IdcardOutlined, InboxOutlin
 import type { UploadProps } from 'antd';
 import { useAuthStore } from '../store/useAuthStore';
 import { authApi, userApi } from '../api';
+import { getAvatarUrl } from '../utils/request';
 import './Profile.scss';
 
 const { Dragger } = Upload;
@@ -48,10 +49,8 @@ const Profile: React.FC = () => {
       try {
         const result = await userApi.uploadAvatar(file as File);
         // 确保头像URL是完整的
-        const fullAvatarUrl = result.avatarUrl.startsWith('http') 
-          ? result.avatarUrl 
-          : `http://localhost:8080${result.avatarUrl}`;
-        updateUser({ ...user!, avatarUrl: fullAvatarUrl });
+        const fullAvatarUrl = getAvatarUrl(result.avatarUrl);
+        updateUser({ ...user!, avatarUrl: fullAvatarUrl || '' });
         message.success('头像上传成功');
         onSuccess?.(result);
       } catch (error: any) {
@@ -82,7 +81,7 @@ const Profile: React.FC = () => {
         <div className="avatar-section">
           <Avatar
             size={100}
-            src={user?.avatarUrl ? (user.avatarUrl.startsWith('http') ? user.avatarUrl : `http://localhost:8080${user.avatarUrl}`) : undefined}
+            src={getAvatarUrl(user?.avatarUrl)}
             icon={<UserOutlined />}
           />
           <Dragger {...uploadProps} style={{ marginTop: 16, maxWidth: 400 }}>

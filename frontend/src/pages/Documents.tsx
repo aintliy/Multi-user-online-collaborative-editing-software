@@ -19,6 +19,8 @@ import {
   Col,
   Breadcrumb,
   Divider,
+  Badge,
+  Avatar,
 } from 'antd';
 import {
   PlusOutlined,
@@ -29,15 +31,19 @@ import {
   EditOutlined,
   DeleteOutlined,
   CopyOutlined,
-  ShareAltOutlined,
   LockOutlined,
   GlobalOutlined,
   HomeOutlined,
   RightOutlined,
+  TeamOutlined,
+  UserOutlined,
+  CheckOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import { documentApi, folderApi, collaboratorApi } from '../api';
-import type { Document, Folder } from '../types';
+import type { Document, Folder, WorkspaceRequest } from '../types';
+import { getAvatarUrl } from '../utils/request';
 import dayjs from 'dayjs';
 import './Documents.scss';
 
@@ -59,12 +65,23 @@ const Documents: React.FC = () => {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
+  // 工作区请求相关
+  const [workspaceRequestsModalOpen, setWorkspaceRequestsModalOpen] = useState(false);
+  const [workspaceRequests, setWorkspaceRequests] = useState<WorkspaceRequest[]>([]);
+  const [workspaceRequestsLoading, setWorkspaceRequestsLoading] = useState(false);
+  
+  // 重命名相关
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameDoc, setRenameDoc] = useState<Document | null>(null);
+  const [renameForm] = Form.useForm();
+  
   const [form] = Form.useForm();
   const [folderForm] = Form.useForm();
 
   useEffect(() => {
     fetchFolders();
     fetchDocuments();
+    fetchWorkspaceRequests();
   }, [selectedFolderId, searchKeyword]);
 
   const fetchFolders = async () => {
@@ -93,6 +110,84 @@ const Documents: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 获取待处理的工作区请求
+  const fetchWorkspaceRequests = async () => {
+    try {
+      const data = await collaboratorApi.getMyPendingRequests();
+      setWorkspaceRequests(data);
+    } catch (error) {
+      console.error('Failed to fetch workspace requests:', error);
+    }
+  };
+
+  // 打开工作区请求管理模态框
+  const handleOpenWorkspaceRequests = async () => {
+    setWorkspaceRequestsModalOpen(true);
+    setWorkspaceRequestsLoading(true);
+    try {
+      const data = await collaboratorApi.getMyPendingRequests();
+      setWorkspaceRequests(data);
+    } catch (error) {
+      console.error('Failed to fetch workspace requests:', error);
+    } finally {
+      setWorkspaceRequestsLoading(false);
+    }
+  };
+
+  // 审批通过工作区请求
+  const handleApproveRequest = async (request: WorkspaceRequest) => {
+    try {
+      const docId = request.documentId || request.document?.id;
+      if (!docId) {
+        message.error('文档ID无效');
+        return;
+      }
+      await collaboratorApi.approveRequest(docId, request.id);
+      message.success('已通过申请');
+      fetchWorkspaceRequests();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '操作失败');
+    }
+  };
+
+  // 拒绝工作区请求
+  const handleRejectRequest = async (request: WorkspaceRequest) => {
+    try {
+      const docId = request.documentId || request.document?.id;
+      if (!docId) {
+        message.error('文档ID无效');
+        return;
+      }
+      await collaboratorApi.rejectRequest(docId, request.id);
+      message.success('已拒绝申请');
+      fetchWorkspaceRequests();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '操作失败');
+    }
+  };
+
+  // 重命名文档
+  const handleRenameDocument = async (values: { title: string }) => {
+    if (!renameDoc) return;
+    try {
+      await documentApi.update(renameDoc.id, { title: values.title });
+      message.success('重命名成功');
+      setRenameModalOpen(false);
+      renameForm.resetFields();
+      setRenameDoc(null);
+      fetchDocuments();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '重命名失败');
+    }
+  };
+
+  // 打开重命名模态框
+  const openRenameModal = (doc: Document) => {
+    setRenameDoc(doc);
+    renameForm.setFieldsValue({ title: doc.title });
+    setRenameModalOpen(true);
   };
 
   const handleImportDocument = async (file: File) => {
@@ -267,24 +362,21 @@ const Documents: React.FC = () => {
   const getDocumentMenuItems = (doc: Document) => [
     {
       key: 'edit',
-      icon: <EditOutlined />,
-      label: '编辑',
+      icon: <FileTextOutlined />,
+      label: '打开',
       onClick: () => navigate(`/documents/${doc.id}`),
+    },
+    {
+      key: 'rename',
+      icon: <EditOutlined />,
+      label: '重命名',
+      onClick: () => openRenameModal(doc),
     },
     {
       key: 'clone',
       icon: <CopyOutlined />,
       label: '克隆',
       onClick: () => handleCloneDocument(doc),
-    },
-    {
-      key: 'share',
-      icon: <ShareAltOutlined />,
-      label: '分享',
-      onClick: () => {
-        setSelectedDoc(doc);
-        setShareModalOpen(true);
-      },
     },
     {
       type: 'divider' as const,
@@ -313,7 +405,7 @@ const Documents: React.FC = () => {
                 }}
               >
                 <HomeOutlined />
-                根目录
+                我的仓库
               </span>
             }
             size="small"
@@ -366,6 +458,14 @@ const Documents: React.FC = () => {
                 />
               </Space>
               <Space>
+                <Badge count={workspaceRequests.length} size="small">
+                  <Button
+                    icon={<TeamOutlined />}
+                    onClick={handleOpenWorkspaceRequests}
+                  >
+                    协作申请
+                  </Button>
+                </Badge>
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -444,7 +544,7 @@ const Documents: React.FC = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".docx,.md,.markdown,.txt"
+            accept=".md,.markdown,.txt"
             style={{ display: 'none' }}
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -582,6 +682,88 @@ const Documents: React.FC = () => {
         ]}
       >
         <p>生成邀请链接后，其他用户可以通过链接加入协作。</p>
+      </Modal>
+
+      {/* Workspace Requests Modal */}
+      <Modal
+        title="协作申请管理"
+        open={workspaceRequestsModalOpen}
+        onCancel={() => setWorkspaceRequestsModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setWorkspaceRequestsModalOpen(false)}>
+            关闭
+          </Button>,
+        ]}
+        width={600}
+      >
+        <List
+          loading={workspaceRequestsLoading}
+          dataSource={workspaceRequests}
+          locale={{ emptyText: '暂无待处理的协作申请' }}
+          renderItem={(request: any) => (
+            <List.Item
+              actions={[
+                <Button
+                  key="approve"
+                  type="primary"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  onClick={() => handleApproveRequest(request)}
+                >
+                  通过
+                </Button>,
+                <Button
+                  key="reject"
+                  danger
+                  size="small"
+                  icon={<CloseOutlined />}
+                  onClick={() => handleRejectRequest(request)}
+                >
+                  拒绝
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={<Avatar src={getAvatarUrl(request.applicant?.avatarUrl)} icon={<UserOutlined />} />}
+                title={
+                  <span>
+                    <strong>{request.applicant?.username}</strong> 申请加入文档 <strong>「{request.document?.title}」</strong>
+                  </span>
+                }
+                description={
+                  <>
+                    {request.message && <div>申请理由: {request.message}</div>}
+                    <div style={{ color: '#999', fontSize: 12 }}>
+                      {dayjs(request.createdAt).format('YYYY-MM-DD HH:mm')}
+                    </div>
+                  </>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </Modal>
+
+      {/* Rename Document Modal */}
+      <Modal
+        title="重命名文档"
+        open={renameModalOpen}
+        onCancel={() => {
+          setRenameModalOpen(false);
+          renameForm.resetFields();
+          setRenameDoc(null);
+        }}
+        onOk={() => renameForm.submit()}
+      >
+        <Form form={renameForm} layout="vertical" onFinish={handleRenameDocument}>
+          <Form.Item
+            name="title"
+            label="文档标题"
+            rules={[{ required: true, message: '请输入文档标题' }]}
+          >
+            <Input placeholder="请输入新的文档标题" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

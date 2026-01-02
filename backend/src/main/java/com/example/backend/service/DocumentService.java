@@ -384,14 +384,15 @@ public class DocumentService {
     }
     
     /**
-     * 回滚文档版本
+     * 回滚文档版本（只有所有者可以回滚）
      */
     @Transactional
     public DocumentVersionDTO rollbackVersion(Long documentId, Long versionId, Long userId) {
         Document document = getActiveDocument(documentId);
         
-        if (!checkDocumentEditPermission(document, userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权编辑此文档");
+        // 只有所有者可以回滚版本
+        if (!document.getOwner().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以回滚版本");
         }
         
         DocumentVersion targetVersion = versionRepository.findById(versionId)
@@ -761,5 +762,15 @@ public class DocumentService {
         } catch (Exception e) {
             return false;
         }
+    }
+    
+    /**
+     * 获取用户的公开文档列表
+     */
+    public List<DocumentDTO> getUserPublicDocuments(Long userId, Long currentUserId) {
+        return documentRepository.findByOwnerIdAndVisibilityAndStatus(userId, "public", "ACTIVE")
+                .stream()
+                .map(doc -> DocumentDTO.fromEntity(doc, currentUserId, false))  // 公开文档默认不可编辑
+                .collect(java.util.stream.Collectors.toList());
     }
 }

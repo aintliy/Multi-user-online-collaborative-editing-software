@@ -52,6 +52,11 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     @Query("SELECT d FROM Document d WHERE d.owner.id = :ownerId AND d.visibility = 'public'")
     Page<Document> findPublicDocumentsByOwnerId(@Param("ownerId") Long ownerId, Pageable pageable);
     
+    /**
+     * 查找指定用户的公开文档（按可见性和状态过滤）
+     */
+    List<Document> findByOwnerIdAndVisibilityAndStatus(Long ownerId, String visibility, String status);
+    
        @Query("SELECT COUNT(d) FROM Document d WHERE d.visibility = :visibility AND d.status <> 'deleted'")
        long countByVisibility(@Param("visibility") String visibility);
     

@@ -20,6 +20,7 @@ import Friends from '../pages/Friends';
 import Notifications from '../pages/Notifications';
 import PublicDocuments from '../pages/PublicDocuments';
 import InviteJoin from '../pages/InviteJoin';
+import UserRepos from '../pages/UserRepos';
 
 // Admin Pages
 import AdminDashboard from '../pages/admin/Dashboard';
@@ -95,6 +96,7 @@ const AppRouter: React.FC = () => {
           <Route path="/profile" element={<Profile />} />
           <Route path="/friends" element={<Friends />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/user/:publicId" element={<UserRepos />} />
         </Route>
 
         {/* Admin Routes */}

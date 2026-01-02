@@ -1,19 +1,29 @@
 package com.example.backend.controller;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.backend.dto.ApiResponse;
-import com.example.backend.dto.collaborator.*;
-import com.example.backend.entity.DocumentWorkspaceRequest;
+import com.example.backend.dto.collaborator.AddCollaboratorRequest;
+import com.example.backend.dto.collaborator.CollaboratorDTO;
+import com.example.backend.dto.collaborator.CreateInviteLinkRequest;
+import com.example.backend.dto.collaborator.JoinByInviteRequest;
+import com.example.backend.dto.collaborator.WorkspaceRequestDTO;
 import com.example.backend.entity.User;
 import com.example.backend.service.CollaboratorService;
 import com.example.backend.service.UserService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * 协作控制器
@@ -61,6 +71,16 @@ public class CollaboratorController {
     }
     
     /**
+     * 获取当前用户拥有的所有文档的待处理协作申请
+     */
+    @GetMapping("/api/workspace-requests/pending")
+    public ApiResponse<List<WorkspaceRequestDTO>> getMyPendingWorkspaceRequests(@AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        List<WorkspaceRequestDTO> requests = collaboratorService.getMyWorkspaceRequests(user.getId());
+        return ApiResponse.success(requests);
+    }
+    
+    /**
      * 提交协作申请
      */
     @PostMapping("/api/documents/{documentId}/workspace-requests")
@@ -72,16 +92,16 @@ public class CollaboratorController {
         return ApiResponse.success("申请已提交");
     }
     
-    /**
-     * 获取协作申请列表
-     */
-    @GetMapping("/api/documents/{documentId}/workspace-requests")
-    public ApiResponse<List<DocumentWorkspaceRequest>> getWorkspaceRequests(@AuthenticationPrincipal UserDetails userDetails,
-                                                                             @PathVariable Long documentId) {
-        User user = userService.getUserByEmail(userDetails.getUsername());
-        List<DocumentWorkspaceRequest> requests = collaboratorService.getWorkspaceRequests(documentId, user.getId());
-        return ApiResponse.success(requests);
-    }
+    // /**
+    //  * 获取协作申请列表
+    //  */
+    // @GetMapping("/api/documents/{documentId}/workspace-requests")
+    // public ApiResponse<List<DocumentWorkspaceRequest>> getWorkspaceRequests(@AuthenticationPrincipal UserDetails userDetails,
+    //                                                                          @PathVariable Long documentId) {
+    //     User user = userService.getUserByEmail(userDetails.getUsername());
+    //     List<DocumentWorkspaceRequest> requests = collaboratorService.getWorkspaceRequests(documentId, user.getId());
+    //     return ApiResponse.success(requests);
+    // }
     
     /**
      * 审批协作申请

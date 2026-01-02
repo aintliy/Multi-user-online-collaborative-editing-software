@@ -1,0 +1,35 @@
+.user-repos-page {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+
+  .user-repos-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+  }
+
+  .user-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 8px;
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+
+      h4 {
+        margin-bottom: 0;
+      }
+
+      .user-profile {
+        margin-top: 8px;
+        color: #666;
+      }
+    }
+  }
+}
