@@ -19,14 +19,4 @@ public class SendMessageRequest {
     
     @NotBlank(message = "消息内容不能为空")
     private String content;
-    
-    /**
-     * 消息类型: TEXT-普通文本, SHARE_LINK-分享链接
-     */
-    private String messageType = "TEXT";
-    
-    /**
-     * 分享链接ID（如果是分享链接消息）
-     */
-    private Long shareLinkId;
 }

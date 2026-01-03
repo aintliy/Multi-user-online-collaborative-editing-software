@@ -22,6 +22,7 @@ public class DocumentDTO {
     private Long ownerId;
     private String ownerName;
     private String ownerPublicId;
+    private String ownerAvatarUrl;
     private String visibility;
     private String docType;
     private Long forkedFromId;
@@ -41,6 +42,7 @@ public class DocumentDTO {
                 .ownerId(document.getOwner().getId())
                 .ownerName(document.getOwner().getUsername())
                 .ownerPublicId(document.getOwner().getPublicId())
+                .ownerAvatarUrl(document.getOwner().getAvatarUrl())
                 .visibility(document.getVisibility())
                 .docType(document.getDocType())
                 .forkedFromId(document.getForkedFrom() != null ? document.getForkedFrom().getId() : null)

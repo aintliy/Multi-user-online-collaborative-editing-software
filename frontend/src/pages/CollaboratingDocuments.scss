@@ -1,0 +1,36 @@
+.collaborating-documents-page {
+  min-height: 100%;
+  padding: 24px;
+
+  .loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+  }
+
+  .document-card {
+    .doc-icon {
+      font-size: 32px;
+      color: #52c41a;
+    }
+
+    .doc-info {
+      margin-top: 8px;
+      
+      .doc-owner {
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+      }
+      
+      .doc-time {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+      }
+    }
+  }
+}

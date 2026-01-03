@@ -5,7 +5,6 @@ import com.example.backend.entity.*;
 import com.example.backend.exception.BusinessException;
 import com.example.backend.exception.ErrorCode;
 import com.example.backend.repository.*;
-import com.example.backend.util.IdGenerator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,7 +25,6 @@ public class CollaboratorService {
     private final DocumentRepository documentRepository;
     private final DocumentCollaboratorRepository collaboratorRepository;
     private final DocumentWorkspaceRequestRepository workspaceRequestRepository;
-    private final DocumentInviteLinkRepository inviteLinkRepository;
     private final UserService userService;
     private final NotificationService notificationService;
     
@@ -34,15 +32,7 @@ public class CollaboratorService {
      * 获取文档协作者列表（包含所有者）
      */
     public List<CollaboratorDTO> getCollaborators(Long documentId, Long userId) {
-        Document document = getDocumentById(documentId);
-        
-        // // 只有所有者或协作者可以查看协作者列表
-        // boolean isOwner = document.getOwner().getId().equals(userId);
-        // boolean isCollaborator = collaboratorRepository.existsByDocumentIdAndUserId(documentId, userId);
-        
-        // if (!isOwner && !isCollaborator) {
-        //     throw new BusinessException(ErrorCode.FORBIDDEN, "只有所有者或协作者可以查看协作者列表");
-        // }
+        Document document = getDocumentById(documentId);      
         
         List<CollaboratorDTO> result = new ArrayList<>();
         
@@ -58,15 +48,15 @@ public class CollaboratorService {
     }
     
     /**
-     * 添加协作者
+     * 邀请协作者（发送邀请，需要对方同意）
      */
     @Transactional
-    public CollaboratorDTO addCollaborator(Long documentId, Long userId, AddCollaboratorRequest request) {
+    public void inviteCollaborator(Long documentId, Long userId, AddCollaboratorRequest request) {
         Document document = getDocumentById(documentId);
         
-        // 只有所有者可以添加协作者
+        // 只有所有者可以邀请协作者
         if (!document.getOwner().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以添加协作者");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以邀请协作者");
         }
         
         // 检查是否已经是协作者
@@ -74,31 +64,113 @@ public class CollaboratorService {
             throw new BusinessException(ErrorCode.COLLABORATOR_ALREADY_EXISTS, "该用户已是协作者");
         }
         
-        // 不能添加自己
+        // 不能邀请自己
         if (request.getUserId().equals(userId)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能将自己添加为协作者");
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能邀请自己");
+        }
+        
+        // 检查是否已有待处理的邀请
+        if (workspaceRequestRepository.existsByDocumentIdAndApplicantIdAndTypeAndStatus(
+                documentId, request.getUserId(), "INVITE", "PENDING")) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "已向该用户发送过邀请，请等待对方处理");
         }
         
         User targetUser = userService.getUserById(request.getUserId());
         User inviter = userService.getUserById(userId);
         
-        DocumentCollaborator collaborator = DocumentCollaborator.builder()
+        // 创建邀请记录
+        DocumentWorkspaceRequest invite = DocumentWorkspaceRequest.builder()
                 .document(document)
-                .user(targetUser)
-                .invitedBy(inviter)
+                .applicant(targetUser)
+                .type("INVITE")
+                .status("PENDING")
+                .message(inviter.getUsername() + " 邀请您协作编辑此文档")
                 .build();
         
-        collaborator = collaboratorRepository.save(collaborator);
+        workspaceRequestRepository.save(invite);
         
         // 发送通知
         notificationService.createNotification(
                 request.getUserId(),
-                "COLLABORATOR_ADDED",
+                "COLLABORATOR_INVITE",
                 documentId,
                 inviter.getUsername() + " 邀请您协作编辑文档「" + document.getTitle() + "」"
         );
+    }
+    
+    /**
+     * 处理协作邀请（被邀请者同意/拒绝）
+     */
+    @Transactional
+    public void handleInvite(Long inviteId, Long userId, boolean accept) {
+        DocumentWorkspaceRequest invite = workspaceRequestRepository.findById(inviteId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PARAM_ERROR, "邀请不存在"));
         
-        return CollaboratorDTO.fromEntity(collaborator);
+        // 只有被邀请者可以处理邀请
+        if (!invite.getApplicant().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权处理此邀请");
+        }
+        
+        // 检查状态
+        if (!"PENDING".equals(invite.getStatus())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该邀请已处理");
+        }
+        
+        // 检查是否是邀请类型
+        if (!"INVITE".equals(invite.getType())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该请求不是邀请类型");
+        }
+        
+        Document document = invite.getDocument();
+        User invitedUser = invite.getApplicant();
+        
+        if (accept) {
+            // 检查是否已经是协作者
+            if (collaboratorRepository.existsByDocumentIdAndUserId(document.getId(), userId)) {
+                throw new BusinessException(ErrorCode.COLLABORATOR_ALREADY_EXISTS, "您已是该文档的协作者");
+            }
+            
+            // 添加为协作者
+            DocumentCollaborator collaborator = DocumentCollaborator.builder()
+                    .document(document)
+                    .user(invitedUser)
+                    .invitedBy(document.getOwner())
+                    .build();
+            collaboratorRepository.save(collaborator);
+            
+            invite.setStatus("APPROVED");
+            
+            // 通知文档所有者
+            notificationService.createNotification(
+                    document.getOwner().getId(),
+                    "COLLABORATOR_INVITE_ACCEPTED",
+                    document.getId(),
+                    invitedUser.getUsername() + " 已接受您的协作邀请，加入了文档「" + document.getTitle() + "」"
+            );
+        } else {
+            invite.setStatus("REJECTED");
+            
+            // 通知文档所有者
+            notificationService.createNotification(
+                    document.getOwner().getId(),
+                    "COLLABORATOR_INVITE_REJECTED",
+                    document.getId(),
+                    invitedUser.getUsername() + " 拒绝了您的协作邀请"
+            );
+        }
+        
+        invite.setHandledAt(LocalDateTime.now());
+        invite.setHandledBy(invitedUser);
+        workspaceRequestRepository.save(invite);
+    }
+    
+    /**
+     * 获取用户收到的待处理邀请
+     */
+    public List<WorkspaceRequestDTO> getMyPendingInvites(Long userId) {
+        return workspaceRequestRepository.findPendingInvitesByUserId(userId, "PENDING").stream()
+                .map(WorkspaceRequestDTO::fromEntity)
+                .toList();
     }
     
     /**
@@ -173,20 +245,6 @@ public class CollaboratorService {
                 applicant.getUsername() + " 申请加入文档「" + document.getTitle() + "」的协作工作区"
         );
     }
-    
-    // /**
-    //  * 获取协作申请列表
-    //  */
-    // public List<DocumentWorkspaceRequest> getWorkspaceRequests(Long documentId, Long userId) {
-    //     Document document = getDocumentById(documentId);
-        
-    //     // 只有所有者可以查看申请列表
-    //     if (!document.getOwner().getId().equals(userId)) {
-    //         throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以查看协作申请");
-    //     }
-        
-    //     return workspaceRequestRepository.findByDocumentIdAndStatus(documentId, "PENDING");
-    // }
     
     /**
      * 获取用户拥有的所有文档的待处理协作申请
@@ -286,78 +344,6 @@ public class CollaboratorService {
                 documentId,
                 "您加入文档「" + document.getTitle() + "」协作工作区的申请被拒绝"
         );
-    }
-    
-    /**
-     * 生成邀请链接
-     */
-    @Transactional
-    public String createInviteLink(Long documentId, Long userId, CreateInviteLinkRequest request) {
-        Document document = getDocumentById(documentId);
-        
-        if (!document.getOwner().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "只有文档所有者可以生成邀请链接");
-        }
-        
-        User creator = userService.getUserById(userId);
-        String token = IdGenerator.generateToken();
-        
-        DocumentInviteLink inviteLink = DocumentInviteLink.builder()
-                .document(document)
-                .token(token)
-                .maxUses(request != null ? request.getMaxUses() : null)
-                .expiresAt(request != null ? request.getExpiresAt() : null)
-                .createdBy(creator)
-                .build();
-        
-        inviteLinkRepository.save(inviteLink);
-        
-        return token;
-    }
-    
-    /**
-     * 通过邀请链接加入协作
-     */
-    @Transactional
-    public void joinByInvite(Long userId, String token) {
-        DocumentInviteLink inviteLink = inviteLinkRepository.findByToken(token)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVITE_LINK_INVALID, "邀请链接无效"));
-        
-        // 检查是否过期
-        if (inviteLink.getExpiresAt() != null && inviteLink.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new BusinessException(ErrorCode.INVITE_LINK_INVALID, "邀请链接已过期");
-        }
-        
-        // 检查使用次数
-        if (inviteLink.getMaxUses() != null && inviteLink.getUsedCount() >= inviteLink.getMaxUses()) {
-            throw new BusinessException(ErrorCode.INVITE_LINK_INVALID, "邀请链接已达到最大使用次数");
-        }
-        
-        Document document = inviteLink.getDocument();
-        
-        // 检查是否已经是协作者
-        if (collaboratorRepository.existsByDocumentIdAndUserId(document.getId(), userId)) {
-            throw new BusinessException(ErrorCode.COLLABORATOR_ALREADY_EXISTS, "您已是该文档的协作者");
-        }
-        
-        // 不能加入自己的文档
-        if (document.getOwner().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "不能加入自己的文档");
-        }
-        
-        User user = userService.getUserById(userId);
-        
-        // 添加为协作者
-        DocumentCollaborator collaborator = DocumentCollaborator.builder()
-                .document(document)
-                .user(user)
-                .invitedBy(inviteLink.getCreatedBy())
-                .build();
-        collaboratorRepository.save(collaborator);
-        
-        // 更新使用次数
-        inviteLink.setUsedCount(inviteLink.getUsedCount() + 1);
-        inviteLinkRepository.save(inviteLink);
     }
     
     private Document getDocumentById(Long documentId) {

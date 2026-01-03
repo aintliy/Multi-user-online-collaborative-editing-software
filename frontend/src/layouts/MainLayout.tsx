@@ -10,6 +10,7 @@ import {
   Button,
   message,
   notification,
+  Tooltip,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -20,10 +21,12 @@ import {
   SettingOutlined,
   GlobalOutlined,
   MessageOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { notificationApi } from '../api';
 import wsService from '../utils/websocket';
+import heartbeatService from '../utils/heartbeat';
 import { getAvatarUrl } from '../utils/request';
 import './MainLayout.scss';
 
@@ -35,6 +38,7 @@ const MainLayout: React.FC = () => {
   const { user, token, logout } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingInvitesCount, setPendingInvitesCount] = useState(0);
   const [unreadMessageMap, setUnreadMessageMap] = useState<Map<number, number>>(new Map()); // 按好友ID追踪未读数
 
   useEffect(() => {
@@ -48,11 +52,28 @@ const MainLayout: React.FC = () => {
           } else {
             // 其他通知刷新未读数
             fetchUnreadCount();
+            // 触发心跳刷新
+            heartbeatService.refresh();
           }
         });
       }).catch((err) => {
         console.error('WebSocket connection failed:', err);
       });
+      
+      // 启动心跳服务
+      heartbeatService.start();
+      
+      // 订阅心跳数据
+      const unsubscribe = heartbeatService.subscribe((data) => {
+        setUnreadCount(data.unreadNotificationCount);
+        setPendingInvitesCount(data.pendingInvitesCount);
+      });
+      
+      return () => {
+        wsService.disconnect();
+        heartbeatService.stop();
+        unsubscribe();
+      };
     }
 
     return () => {
@@ -102,7 +123,7 @@ const MainLayout: React.FC = () => {
     
     notification.info({
       key,
-      message: `来自 ${data.senderName} 的消息`,
+      title: `来自 ${data.senderName} 的消息`,
       description: (
         <div>
           <div style={{ marginBottom: 8 }}>{messageContent}</div>
@@ -177,18 +198,23 @@ const MainLayout: React.FC = () => {
       label: '我的文档',
     },
     {
+      key: '/collaborating',
+      icon: <TeamOutlined />,
+      label: '协作文档',
+    },
+    {
       key: '/public',
       icon: <GlobalOutlined />,
       label: '公开文档',
     },
     {
       key: '/friends',
-      icon: <Badge count={totalUnreadMessageCount} size="small"><TeamOutlined /></Badge>,
+      icon: <Badge count={totalUnreadMessageCount} size="small"><MessageOutlined /></Badge>,
       label: '好友',
     },
     {
       key: '/notifications',
-      icon: <Badge count={unreadCount} size="small"><BellOutlined /></Badge>,
+      icon: <Badge count={unreadCount + pendingInvitesCount} size="small"><BellOutlined /></Badge>,
       label: '通知',
     },
   ];
@@ -247,6 +273,16 @@ const MainLayout: React.FC = () => {
               {/* Can add breadcrumb or title here */}
             </div>
             <div className="header-actions">
+              <Tooltip title="刷新消息">
+                <Button
+                  type="text"
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    heartbeatService.refresh();
+                    message.success('已刷新');
+                  }}
+                />
+              </Tooltip>
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <Space className="user-info" style={{ cursor: 'pointer' }}>
                   <Avatar 

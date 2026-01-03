@@ -10,8 +10,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 文档协作申请实体类
+ * 文档协作请求实体类
  * 对应数据库表 document_workspace_requests
+ * 支持两种类型: APPLY-用户申请加入, INVITE-所有者邀请
  */
 @Data
 @NoArgsConstructor
@@ -33,11 +34,18 @@ public class DocumentWorkspaceRequest {
     private Document document;
     
     /**
-     * 申请人
+     * 申请人/被邀请人
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "applicant_id", nullable = false)
     private User applicant;
+    
+    /**
+     * 请求类型: APPLY-用户申请加入, INVITE-所有者邀请
+     */
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    private String type = "APPLY";
     
     /**
      * 申请状态: PENDING / APPROVED / REJECTED

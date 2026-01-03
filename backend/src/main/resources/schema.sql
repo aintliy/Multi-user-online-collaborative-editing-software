@@ -10,7 +10,6 @@ DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TABLE IF EXISTS comments CASCADE;
 DROP TABLE IF EXISTS user_friends CASCADE;
-DROP TABLE IF EXISTS document_invite_links CASCADE;
 DROP TABLE IF EXISTS document_workspace_requests CASCADE;
 DROP TABLE IF EXISTS document_collaborators CASCADE;
 DROP TABLE IF EXISTS document_versions CASCADE;
@@ -18,7 +17,7 @@ DROP TABLE IF EXISTS documents CASCADE;
 DROP TABLE IF EXISTS document_folders CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS friend_messages CASCADE;
-DROP TABLE IF EXISTS document_share_links CASCADE;
+
 
 
 -- =====================================================
@@ -85,6 +84,8 @@ CREATE TABLE documents (
   storage_path   VARCHAR(512),
   created_at     TIMESTAMP DEFAULT NOW(),
   updated_at     TIMESTAMP DEFAULT NOW(),
+  -- 同一所有者同一文件夹下文档名唯一（逻辑删除时 folder_id 为 NULL，不参与约束）
+  CONSTRAINT uq_doc_title_per_folder UNIQUE (owner_id, folder_id, title)
 );
 
 CREATE INDEX idx_documents_owner ON documents(owner_id);
@@ -140,12 +141,14 @@ COMMENT ON TABLE document_collaborators IS '文档协作者表';
 COMMENT ON COLUMN document_collaborators.invited_by IS '邀请人ID';
 
 -- =====================================================
--- 6. 文档协作申请表 (document_workspace_requests)
+-- 6. 文档协作请求表 (document_workspace_requests)
+-- 支持两种类型: APPLY-用户申请加入, INVITE-所有者邀请
 -- =====================================================
 CREATE TABLE document_workspace_requests (
   id           BIGSERIAL PRIMARY KEY,
   document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   applicant_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type         VARCHAR(20) NOT NULL DEFAULT 'APPLY',
   status       VARCHAR(20) NOT NULL DEFAULT 'PENDING',
   message      VARCHAR(255),
   created_at   TIMESTAMP DEFAULT NOW(),
@@ -156,37 +159,18 @@ CREATE TABLE document_workspace_requests (
 CREATE INDEX idx_workspace_requests_document ON document_workspace_requests(document_id);
 CREATE INDEX idx_workspace_requests_applicant ON document_workspace_requests(applicant_id);
 CREATE INDEX idx_workspace_requests_status ON document_workspace_requests(status);
+CREATE INDEX idx_workspace_requests_type ON document_workspace_requests(type);
 
--- 部分唯一索引：仅当 status = 'PENDING' 时同一用户对同一文档不能重复申请
-CREATE UNIQUE INDEX uq_pending_request ON document_workspace_requests(document_id, applicant_id, status) 
+-- 部分唯一索引：仅当 status = 'PENDING' 时同一用户对同一文档同一类型不能重复请求
+CREATE UNIQUE INDEX uq_pending_request ON document_workspace_requests(document_id, applicant_id, type, status) 
   WHERE status = 'PENDING';
 
-COMMENT ON TABLE document_workspace_requests IS '文档协作申请表';
-COMMENT ON COLUMN document_workspace_requests.status IS '申请状态: PENDING-待处理, APPROVED-已通过, REJECTED-已拒绝';
+COMMENT ON TABLE document_workspace_requests IS '文档协作请求表';
+COMMENT ON COLUMN document_workspace_requests.type IS '请求类型: APPLY-用户申请加入, INVITE-所有者邀请';
+COMMENT ON COLUMN document_workspace_requests.status IS '请求状态: PENDING-待处理, APPROVED-已通过, REJECTED-已拒绝';
 
 -- =====================================================
--- 7. 文档邀请链接表 (document_invite_links)
--- =====================================================
-CREATE TABLE document_invite_links (
-  id           BIGSERIAL PRIMARY KEY,
-  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  token        VARCHAR(64) NOT NULL UNIQUE,
-  max_uses     INTEGER,
-  used_count   INTEGER DEFAULT 0,
-  expires_at   TIMESTAMP,
-  created_by   BIGINT REFERENCES users(id),
-  created_at   TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_invite_links_document ON document_invite_links(document_id);
-CREATE INDEX idx_invite_links_token ON document_invite_links(token);
-
-COMMENT ON TABLE document_invite_links IS '文档邀请链接表';
-COMMENT ON COLUMN document_invite_links.token IS '邀请链接中的随机token';
-COMMENT ON COLUMN document_invite_links.max_uses IS '最大可用次数，NULL表示无限制';
-
--- =====================================================
--- 8. 好友关系表 (user_friends)
+-- 7. 好友关系表 (user_friends)
 -- =====================================================
 CREATE TABLE user_friends (
   id           BIGSERIAL PRIMARY KEY,
@@ -206,7 +190,7 @@ COMMENT ON TABLE user_friends IS '好友关系表';
 COMMENT ON COLUMN user_friends.status IS '好友状态: PENDING-待确认, ACCEPTED-已接受, REJECTED-已拒绝, BLOCKED-已屏蔽';
 
 -- =====================================================
--- 9. 评论表 (comments)
+-- 8. 评论表 (comments)
 -- =====================================================
 CREATE TABLE comments (
   id                   BIGSERIAL PRIMARY KEY,
@@ -229,7 +213,7 @@ COMMENT ON COLUMN comments.range_info IS '选中范围信息（JSON字符串）'
 COMMENT ON COLUMN comments.status IS '评论状态: open-打开, resolved-已解决';
 
 -- =====================================================
--- 10. 文档内聊天消息表 (chat_messages)
+-- 9. 文档内聊天消息表 (chat_messages)
 -- =====================================================
 CREATE TABLE chat_messages (
   id           BIGSERIAL PRIMARY KEY,
@@ -246,7 +230,7 @@ CREATE INDEX idx_chat_messages_created ON chat_messages(created_at DESC);
 COMMENT ON TABLE chat_messages IS '文档内聊天消息表（持久化）';
 
 -- =====================================================
--- 11. 通知表 (notifications)
+-- 10. 通知表 (notifications)
 -- =====================================================
 CREATE TABLE notifications (
   id            BIGSERIAL PRIMARY KEY,
@@ -267,7 +251,7 @@ COMMENT ON COLUMN notifications.type IS '通知类型: COMMENT-评论, PERMISSIO
 COMMENT ON COLUMN notifications.reference_id IS '关联业务实体ID';
 
 -- =====================================================
--- 12. 操作日志表 (operation_logs)
+-- 11 . 操作日志表 (operation_logs)
 -- =====================================================
 CREATE TABLE operation_logs (
   id           BIGSERIAL PRIMARY KEY,
@@ -288,15 +272,13 @@ COMMENT ON COLUMN operation_logs.action IS '操作类型: CREATE_DOC, DELETE_DOC
 COMMENT ON COLUMN operation_logs.target_type IS '目标类型: DOC-文档, USER-用户, ROLE-角色, PERMISSION-权限';
 
 -- =====================================================
--- 13. 好友私聊消息表 (friend_messages)
+-- 12. 好友私聊消息表 (friend_messages)
 -- =====================================================
 CREATE TABLE friend_messages (
   id           BIGSERIAL PRIMARY KEY,
   sender_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   receiver_id  BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content      TEXT NOT NULL,
-  message_type VARCHAR(20) DEFAULT 'TEXT',  -- TEXT-普通文本, SHARE_LINK-分享链接
-  share_link_id BIGINT,
   is_read      BOOLEAN DEFAULT FALSE,
   created_at   TIMESTAMP DEFAULT NOW()
 );
@@ -306,34 +288,6 @@ CREATE INDEX IF NOT EXISTS idx_friend_messages_receiver ON friend_messages(recei
 CREATE INDEX IF NOT EXISTS idx_friend_messages_created ON friend_messages(created_at DESC);
 
 COMMENT ON TABLE friend_messages IS '好友私聊消息表';
-COMMENT ON COLUMN friend_messages.message_type IS '消息类型: TEXT-普通文本, SHARE_LINK-分享链接';
-COMMENT ON COLUMN friend_messages.share_link_id IS '关联的分享链接ID';
-
--- =====================================================
--- 14. 文档分享链接表 (document_share_links)
--- 一次性使用，仅限好友聊天分享
--- =====================================================
-CREATE TABLE document_share_links (
-  id           BIGSERIAL PRIMARY KEY,
-  document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  token        VARCHAR(64) NOT NULL UNIQUE,
-  created_by   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  is_used      BOOLEAN DEFAULT FALSE,
-  used_by      BIGINT REFERENCES users(id),
-  used_at      TIMESTAMP,
-  expires_at   TIMESTAMP NOT NULL,
-  created_at   TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_share_links_document ON document_share_links(document_id);
-CREATE INDEX IF NOT EXISTS idx_share_links_token ON document_share_links(token);
-CREATE INDEX IF NOT EXISTS idx_share_links_created_by ON document_share_links(created_by);
-
-COMMENT ON TABLE document_share_links IS '文档分享链接表（一次性使用，仅限好友聊天）';
-COMMENT ON COLUMN document_share_links.token IS '分享链接token';
-COMMENT ON COLUMN document_share_links.is_used IS '是否已使用';
-COMMENT ON COLUMN document_share_links.used_by IS '使用人ID';
-COMMENT ON COLUMN document_share_links.expires_at IS '过期时间（24小时后过期）';
 
 -- =====================================================
 -- 建表完成

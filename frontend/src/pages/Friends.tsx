@@ -22,10 +22,9 @@ import {
   DeleteOutlined,
   MessageOutlined,
   SendOutlined,
-  LinkOutlined,
   FolderOpenOutlined,
 } from '@ant-design/icons';
-import { friendApi, userApi, documentApi } from '../api';
+import { friendApi, userApi } from '../api';
 import type { Friend, FriendMessage, User } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { getAvatarUrl } from '../utils/request';
@@ -222,31 +221,6 @@ const Friends: React.FC = () => {
     }
   };
 
-  // 处理分享链接点击
-  const handleShareLinkClick = async (shareLinkInfo: FriendMessage['shareLinkInfo'], token?: string) => {
-    if (!shareLinkInfo) return;
-    if (shareLinkInfo.isUsed) {
-      message.warning('该分享链接已被使用');
-      return;
-    }
-    if (shareLinkInfo.isExpired) {
-      message.warning('该分享链接已过期');
-      return;
-    }
-    // 尝试使用分享链接
-    if (token) {
-      try {
-        const result = await documentApi.useShareLink(token);
-        message.success('已成功加入协作');
-        navigate(`/documents/${result.documentId}`);
-      } catch (error: any) {
-        message.error(error.response?.data?.message || '使用分享链接失败');
-      }
-    } else {
-      navigate(`/documents/${shareLinkInfo.documentId}`);
-    }
-  };
-
   // 渲染聊天消息
   const renderChatMessage = (msg: FriendMessage) => {
     const isOwn = msg.sender?.id === currentUser?.id;
@@ -254,28 +228,7 @@ const Friends: React.FC = () => {
       <div key={msg.id} className={`chat-message ${isOwn ? 'own' : ''}`}>
         {!isOwn && <Avatar size="small" src={getAvatarUrl(msg.sender?.avatarUrl)} icon={<UserOutlined />} />}
         <div className="message-content">
-          {msg.messageType === 'SHARE_LINK' && msg.shareLinkInfo ? (
-            <div 
-              className={`share-link-card ${msg.shareLinkInfo.isUsed || msg.shareLinkInfo.isExpired ? 'disabled' : ''}`}
-              onClick={() => handleShareLinkClick(msg.shareLinkInfo)}
-            >
-              <LinkOutlined />
-              <div className="share-info">
-                <div className="doc-title">{msg.shareLinkInfo.documentTitle}</div>
-                <div className="share-status">
-                  {msg.shareLinkInfo.isUsed ? (
-                    <Tag color="default">已使用</Tag>
-                  ) : msg.shareLinkInfo.isExpired ? (
-                    <Tag color="red">已过期</Tag>
-                  ) : (
-                    <Tag color="green">点击加入协作</Tag>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="message-text">{msg.content}</div>
-          )}
+          <div className="message-text">{msg.content}</div>
           <div className="message-time">{dayjs(msg.createdAt).format('HH:mm')}</div>
         </div>
         {isOwn && <Avatar size="small" src={getAvatarUrl(currentUser?.avatarUrl)} icon={<UserOutlined />} />}

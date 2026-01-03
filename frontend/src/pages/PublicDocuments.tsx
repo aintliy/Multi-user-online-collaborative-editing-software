@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, List, Input, Empty, Button, message } from 'antd';
+import { Card, List, Input, Empty, Button, message, Avatar } from 'antd';
 import {
   FileTextOutlined,
   GlobalOutlined,
@@ -11,6 +11,7 @@ import {
 import { documentApi, collaboratorApi } from '../api';
 import type { Document } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
+import { getAvatarUrl } from '../utils/request';
 import dayjs from 'dayjs';
 import './PublicDocuments.scss';
 
@@ -138,7 +139,13 @@ const PublicDocuments: React.FC = () => {
                     description={
                       <div className="doc-info">
                         <div className="doc-owner">
-                          <UserOutlined /> {doc.ownerName || '未知用户'}
+                          <Avatar 
+                            size="small" 
+                            src={getAvatarUrl(doc.ownerAvatarUrl)} 
+                            icon={<UserOutlined />}
+                            style={{ marginRight: 4 }}
+                          />
+                          {doc.ownerName || '未知用户'}
                         </div>
                         <div className="doc-time">
                           <ClockCircleOutlined /> {dayjs(doc.updatedAt).format('YYYY-MM-DD')}

@@ -92,7 +92,12 @@ public class FriendService {
     public void acceptFriendRequest(Long requestId, Long userId) {
         UserFriend request = friendRepository.findById(requestId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FRIEND_REQUEST_NOT_FOUND, "好友请求不存在"));
-        
+         
+        // 检查是否已经是好友
+        if (friendRepository.areFriends(userId, request.getUser().getId())) {
+            throw new BusinessException(ErrorCode.ALREADY_FRIENDS, "你们已经是好友了");
+        }
+
         // 验证是否是发给当前用户的请求
         if (!request.getFriend().getId().equals(userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权处理此请求");

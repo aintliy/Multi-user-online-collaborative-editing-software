@@ -19,7 +19,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "documents")
+@Table(name = "documents", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_doc_title_per_folder", columnNames = {"owner_id", "folder_id", "title"})
+})
 public class Document {
     
     @Id
@@ -50,11 +52,11 @@ public class Document {
     private String docType = "markdown";
     
     /**
-     * 可见性: private / public
+     * 可见性: PRIVATE-私有, PUBLIC-公开
      */
     @Column(length = 20)
     @Builder.Default
-    private String visibility = "private";
+    private String visibility = "PRIVATE";
     
     /**
      * 标签，逗号分隔

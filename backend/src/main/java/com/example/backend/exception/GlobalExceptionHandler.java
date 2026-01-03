@@ -1,7 +1,9 @@
 package com.example.backend.exception;
 
-import com.example.backend.dto.ApiResponse;
-import lombok.extern.slf4j.Slf4j;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -12,8 +14,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.example.backend.dto.ApiResponse;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 全局异常处理器
@@ -26,6 +29,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         log.warn("业务异常: code={}, message={}", e.getCode(), e.getMessage());
         return ResponseEntity.ok(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+    
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        log.warn("数据完整性异常: {}", e.getMessage());
+        String message = "数据操作失败";
+        // 检查是否是唯一约束冲突
+        if (e.getMessage() != null && e.getMessage().contains("uq_doc_title_per_folder")) {
+            message = "该文件夹下已存在同名文档";
+        } else if (e.getMessage() != null && e.getMessage().contains("uq_folder_name_per_parent")) {
+            message = "该目录下已存在同名文件夹";
+        }
+        return ResponseEntity.ok(ApiResponse.error(ErrorCode.PARAM_ERROR, message));
     }
     
     @ExceptionHandler(MethodArgumentNotValidException.class)

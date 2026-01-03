@@ -19,7 +19,7 @@ import Profile from '../pages/Profile';
 import Friends from '../pages/Friends';
 import Notifications from '../pages/Notifications';
 import PublicDocuments from '../pages/PublicDocuments';
-import InviteJoin from '../pages/InviteJoin';
+import CollaboratingDocuments from '../pages/CollaboratingDocuments';
 import UserRepos from '../pages/UserRepos';
 
 // Admin Pages
@@ -76,9 +76,6 @@ const AppRouter: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPassword />} />
         </Route>
 
-        {/* Invite Join Route */}
-        <Route path="/invite/:token" element={<InviteJoin />} />
-
         {/* Public Routes */}
         <Route path="/public" element={<PublicDocuments />} />
 
@@ -93,6 +90,7 @@ const AppRouter: React.FC = () => {
           <Route path="/" element={<Documents />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/documents/:id" element={<DocumentEdit />} />
+          <Route path="/collaborating" element={<CollaboratingDocuments />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/friends" element={<Friends />} />
           <Route path="/notifications" element={<Notifications />} />

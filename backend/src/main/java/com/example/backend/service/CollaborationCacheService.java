@@ -20,8 +20,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CollaborationCacheService {
 
-    //private static final Duration DEFAULT_DRAFT_TTL = Duration.ofSeconds(60);
-    //private static final Duration DEFAULT_SAVE_LOCK_TTL = Duration.ofSeconds(5);
     private static final int DEFAULT_DRAFT_TTL_HOURS = 1;
     private static final int DEFAULT_SAVE_LOCK_TTL_SECONDS = 5;
 

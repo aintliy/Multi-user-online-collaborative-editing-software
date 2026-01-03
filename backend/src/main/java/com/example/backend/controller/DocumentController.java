@@ -26,17 +26,13 @@ import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.dto.document.DocumentVersionDTO;
 import com.example.backend.dto.document.MoveDocumentRequest;
 import com.example.backend.dto.document.SaveDocumentRequest;
-import com.example.backend.dto.document.ShareLinkDTO;
 import com.example.backend.dto.document.UpdateDocumentRequest;
 import com.example.backend.entity.User;
 import com.example.backend.service.DocumentService;
-import com.example.backend.service.DocumentShareService;
 import com.example.backend.service.UserService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-
-import java.util.Map;
 
 /**
  * 文档控制器
@@ -47,7 +43,6 @@ import java.util.Map;
 public class DocumentController {
     
     private final DocumentService documentService;
-    private final DocumentShareService documentShareService;
     private final UserService userService;
     // 仅做调度，具体实现放在 Service 层
     
@@ -163,6 +158,17 @@ public class DocumentController {
     }
     
     /**
+     * 获取用户已加入的协作文档列表
+     */
+    @GetMapping("/collaborating")
+    public ApiResponse<java.util.List<DocumentDTO>> getCollaboratingDocuments(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        java.util.List<DocumentDTO> documents = documentService.getCollaboratingDocuments(user.getId());
+        return ApiResponse.success(documents);
+    }
+    
+    /**
      * 提交文档新版本
      */
     @PostMapping("/{id}/commits")
@@ -246,38 +252,5 @@ public class DocumentController {
         User user = userService.getUserByEmail(userDetails.getUsername());
         DocumentDTO document = documentService.moveDocument(id, user.getId(), request);
         return ApiResponse.success("移动成功", document);
-    }
-    
-    // ========== 文档分享链接相关接口 ==========
-    
-    /**
-     * 创建分享链接（一次性使用，仅限好友聊天分享）
-     */
-    @PostMapping("/{id}/share-links")
-    public ApiResponse<ShareLinkDTO> createShareLink(@AuthenticationPrincipal UserDetails userDetails,
-                                                      @PathVariable Long id) {
-        User user = userService.getUserByEmail(userDetails.getUsername());
-        ShareLinkDTO shareLink = documentShareService.createShareLink(id, user.getId());
-        return ApiResponse.success("分享链接已创建", shareLink);
-    }
-    
-    /**
-     * 使用分享链接加入协作
-     */
-    @PostMapping("/share-links/{token}/use")
-    public ApiResponse<Map<String, Long>> useShareLink(@AuthenticationPrincipal UserDetails userDetails,
-                                                        @PathVariable String token) {
-        User user = userService.getUserByEmail(userDetails.getUsername());
-        Long documentId = documentShareService.useShareLink(token, user.getId());
-        return ApiResponse.success("已加入协作", Map.of("documentId", documentId));
-    }
-    
-    /**
-     * 获取分享链接信息
-     */
-    @GetMapping("/share-links/{token}")
-    public ApiResponse<ShareLinkDTO> getShareLinkInfo(@PathVariable String token) {
-        ShareLinkDTO shareLink = documentShareService.getShareLinkInfo(token);
-        return ApiResponse.success(shareLink);
     }
 }

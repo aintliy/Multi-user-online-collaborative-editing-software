@@ -61,8 +61,6 @@ const Documents: React.FC = () => {
   // Modals
   const [createDocModalOpen, setCreateDocModalOpen] = useState(false);
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   // 工作区请求相关
@@ -289,28 +287,6 @@ const Documents: React.FC = () => {
       navigate(`/documents/${newDoc.id}`);
     } catch (error: any) {
       message.error(error.response?.data?.message || '克隆失败');
-    }
-  };
-
-  const handleGenerateInviteLink = async () => {
-    if (!selectedDoc) return;
-    try {
-      const result = await collaboratorApi.createInviteLink(selectedDoc.id);
-      Modal.success({
-        title: '邀请链接已生成',
-        content: (
-          <div>
-            <p>分享以下链接邀请他人协作：</p>
-            <Input.TextArea
-              value={result.inviteUrl}
-              readOnly
-              autoSize={{ minRows: 2 }}
-            />
-          </div>
-        ),
-      });
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '生成失败');
     }
   };
 
@@ -592,7 +568,7 @@ const Documents: React.FC = () => {
                         <FileTextOutlined className="document-icon" />
                         <span>{doc.title}</span>
                         <Tag color="cyan">{doc.docType?.toUpperCase() || 'MARKDOWN'}</Tag>
-                        {doc.visibility.toLowerCase() === 'private' ? (
+                        {doc.visibility === 'PRIVATE' ? (
                           <Tag icon={<LockOutlined />} color="default">私有</Tag>
                         ) : (
                           <Tag icon={<GlobalOutlined />} color="blue">公开</Tag>
@@ -649,10 +625,10 @@ const Documents: React.FC = () => {
               <Select.Option value="txt">纯文本 (TXT)</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="visibility" label="可见性" initialValue="private">
+          <Form.Item name="visibility" label="可见性" initialValue="PRIVATE">
             <Select>
-              <Select.Option value="private">私有</Select.Option>
-              <Select.Option value="public">公开</Select.Option>
+              <Select.Option value="PRIVATE">私有</Select.Option>
+              <Select.Option value="PUBLIC">公开</Select.Option>
             </Select>
           </Form.Item>
         </Form>
@@ -677,23 +653,6 @@ const Documents: React.FC = () => {
             <Input placeholder="请输入文件夹名称" />
           </Form.Item>
         </Form>
-      </Modal>
-
-      {/* Share Modal */}
-      <Modal
-        title="分享文档"
-        open={shareModalOpen}
-        onCancel={() => setShareModalOpen(false)}
-        footer={[
-          <Button key="cancel" onClick={() => setShareModalOpen(false)}>
-            关闭
-          </Button>,
-          <Button key="generate" type="primary" onClick={handleGenerateInviteLink}>
-            生成邀请链接
-          </Button>,
-        ]}
-      >
-        <p>生成邀请链接后，其他用户可以通过链接加入协作。</p>
       </Modal>
 
       {/* Workspace Requests Modal */}

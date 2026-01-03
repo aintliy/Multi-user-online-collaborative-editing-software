@@ -1,7 +1,6 @@
 package com.example.backend.controller;
 
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,8 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.backend.dto.ApiResponse;
 import com.example.backend.dto.collaborator.AddCollaboratorRequest;
 import com.example.backend.dto.collaborator.CollaboratorDTO;
-import com.example.backend.dto.collaborator.CreateInviteLinkRequest;
-import com.example.backend.dto.collaborator.JoinByInviteRequest;
 import com.example.backend.dto.collaborator.WorkspaceRequestDTO;
 import com.example.backend.entity.User;
 import com.example.backend.service.CollaboratorService;
@@ -47,15 +44,15 @@ public class CollaboratorController {
     }
     
     /**
-     * 添加协作者
+     * 邀请协作者（发送邀请）
      */
     @PostMapping("/api/documents/{documentId}/collaborators")
-    public ApiResponse<CollaboratorDTO> addCollaborator(@AuthenticationPrincipal UserDetails userDetails,
-                                                         @PathVariable Long documentId,
-                                                         @Valid @RequestBody AddCollaboratorRequest request) {
+    public ApiResponse<Void> inviteCollaborator(@AuthenticationPrincipal UserDetails userDetails,
+                                                 @PathVariable Long documentId,
+                                                 @Valid @RequestBody AddCollaboratorRequest request) {
         User user = userService.getUserByEmail(userDetails.getUsername());
-        CollaboratorDTO collaborator = collaboratorService.addCollaborator(documentId, user.getId(), request);
-        return ApiResponse.success("添加成功", collaborator);
+        collaboratorService.inviteCollaborator(documentId, user.getId(), request);
+        return ApiResponse.success("邀请已发送");
     }
     
     /**
@@ -81,6 +78,38 @@ public class CollaboratorController {
     }
     
     /**
+     * 获取当前用户收到的待处理邀请
+     */
+    @GetMapping("/api/collaborator-invites/pending")
+    public ApiResponse<List<WorkspaceRequestDTO>> getMyPendingInvites(@AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        List<WorkspaceRequestDTO> invites = collaboratorService.getMyPendingInvites(user.getId());
+        return ApiResponse.success(invites);
+    }
+    
+    /**
+     * 接受协作邀请
+     */
+    @PostMapping("/api/collaborator-invites/{inviteId}/accept")
+    public ApiResponse<Void> acceptInvite(@AuthenticationPrincipal UserDetails userDetails,
+                                           @PathVariable Long inviteId) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        collaboratorService.handleInvite(inviteId, user.getId(), true);
+        return ApiResponse.success("已接受邀请");
+    }
+    
+    /**
+     * 拒绝协作邀请
+     */
+    @PostMapping("/api/collaborator-invites/{inviteId}/reject")
+    public ApiResponse<Void> rejectInvite(@AuthenticationPrincipal UserDetails userDetails,
+                                           @PathVariable Long inviteId) {
+        User user = userService.getUserByEmail(userDetails.getUsername());
+        collaboratorService.handleInvite(inviteId, user.getId(), false);
+        return ApiResponse.success("已拒绝邀请");
+    }
+    
+    /**
      * 提交协作申请
      */
     @PostMapping("/api/documents/{documentId}/workspace-requests")
@@ -91,17 +120,6 @@ public class CollaboratorController {
         collaboratorService.submitWorkspaceRequest(documentId, user.getId(), request);
         return ApiResponse.success("申请已提交");
     }
-    
-    // /**
-    //  * 获取协作申请列表
-    //  */
-    // @GetMapping("/api/documents/{documentId}/workspace-requests")
-    // public ApiResponse<List<DocumentWorkspaceRequest>> getWorkspaceRequests(@AuthenticationPrincipal UserDetails userDetails,
-    //                                                                          @PathVariable Long documentId) {
-    //     User user = userService.getUserByEmail(userDetails.getUsername());
-    //     List<DocumentWorkspaceRequest> requests = collaboratorService.getWorkspaceRequests(documentId, user.getId());
-    //     return ApiResponse.success(requests);
-    // }
     
     /**
      * 审批协作申请
@@ -125,29 +143,5 @@ public class CollaboratorController {
         User user = userService.getUserByEmail(userDetails.getUsername());
         collaboratorService.rejectWorkspaceRequest(documentId, requestId, user.getId());
         return ApiResponse.success("已拒绝");
-    }
-    
-    /**
-     * 生成邀请链接
-     */
-    @PostMapping("/api/documents/{documentId}/invite-links")
-    public ApiResponse<Map<String, String>> createInviteLink(@AuthenticationPrincipal UserDetails userDetails,
-                                                              @PathVariable Long documentId,
-                                                              @RequestBody(required = false) CreateInviteLinkRequest request) {
-        User user = userService.getUserByEmail(userDetails.getUsername());
-        String token = collaboratorService.createInviteLink(documentId, user.getId(), request);
-        String inviteUrl = "http://localhost:3000/join?token=" + token;
-        return ApiResponse.success(Map.of("token", token, "inviteUrl", inviteUrl));
-    }
-    
-    /**
-     * 通过邀请链接加入协作
-     */
-    @PostMapping("/api/documents/join-by-invite")
-    public ApiResponse<Void> joinByInvite(@AuthenticationPrincipal UserDetails userDetails,
-                                           @Valid @RequestBody JoinByInviteRequest request) {
-        User user = userService.getUserByEmail(userDetails.getUsername());
-        collaboratorService.joinByInvite(user.getId(), request.getToken());
-        return ApiResponse.success("加入成功");
     }
 }

@@ -45,19 +45,6 @@ public class FriendMessage {
     private String content;
     
     /**
-     * 消息类型: TEXT-普通文本, SHARE_LINK-分享链接
-     */
-    @Column(name = "message_type", length = 20)
-    @Builder.Default
-    private String messageType = "TEXT";
-    
-    /**
-     * 关联的分享链接ID（如果是分享链接消息）
-     */
-    @Column(name = "share_link_id")
-    private Long shareLinkId;
-    
-    /**
      * 是否已读
      */
     @Column(name = "is_read")

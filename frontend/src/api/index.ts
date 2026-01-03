@@ -14,7 +14,6 @@ import type {
   WorkspaceRequest,
   Friend,
   FriendMessage,
-  ShareLink,
   Comment,
   Notification,
   ChatMessage,
@@ -111,6 +110,10 @@ export const documentApi = {
   searchPublic: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
     get<PageResponse<Document>>('/documents/public', { params }),
   
+  // 获取用户已加入的协作文档
+  getCollaborating: () =>
+    get<Document[]>('/documents/collaborating'),
+  
   // 提交文档版本
   commit: (id: number, data: { content: string; commitMessage: string }) =>
     post<DocumentVersion>(`/documents/${id}/commits`, data),
@@ -155,18 +158,6 @@ export const documentApi = {
   exportPdf: (id: number) => `/documents/${id}/export/pdf`,
   exportTxt: (id: number) => `/documents/${id}/export/txt`,
   exportMd: (id: number) => `/documents/${id}/export/md`,
-
-  // 创建分享链接
-  createShareLink: (id: number) =>
-    post<ShareLink>(`/documents/${id}/share-links`),
-  
-  // 使用分享链接
-  useShareLink: (token: string) =>
-    post<{ documentId: number }>(`/documents/share-links/${token}/use`),
-  
-  // 获取分享链接信息
-  getShareLinkInfo: (token: string) =>
-    get<ShareLink>(`/documents/share-links/${token}`),
 };
 
 // ========== 文件夹相关 API ==========
@@ -222,13 +213,17 @@ export const collaboratorApi = {
   rejectRequest: (documentId: number, requestId: number) =>
     post<void>(`/documents/${documentId}/workspace-requests/${requestId}/reject`),
   
-  // 生成邀请链接
-  createInviteLink: (documentId: number, data?: { maxUses?: number; expiresInHours?: number }) =>
-    post<{ token: string; inviteUrl: string }>(`/documents/${documentId}/invite-links`, data),
+  // 获取当前用户收到的待处理协作邀请
+  getMyPendingInvites: () =>
+    get<WorkspaceRequest[]>('/collaborator-invites/pending'),
   
-  // 通过邀请链接加入
-  joinByInvite: (token: string) =>
-    post<void>('/documents/join-by-invite', { token }),
+  // 接受协作邀请
+  acceptInvite: (inviteId: number) =>
+    post<void>(`/collaborator-invites/${inviteId}/accept`),
+  
+  // 拒绝协作邀请
+  rejectInvite: (inviteId: number) =>
+    post<void>(`/collaborator-invites/${inviteId}/reject`),
 };
 
 // ========== 好友相关 API ==========
@@ -258,8 +253,8 @@ export const friendApi = {
     del<void>(`/friends/${friendUserId}`),
   
   // 发送消息给好友
-  sendMessage: (receiverId: number, content: string, messageType?: string, shareLinkId?: number) =>
-    post<FriendMessage>('/friends/messages', { receiverId, content, messageType, shareLinkId }),
+  sendMessage: (receiverId: number, content: string) =>
+    post<FriendMessage>('/friends/messages', { receiverId, content }),
   
   // 获取与某好友的聊天记录
   getMessages: (friendId: number) =>
@@ -352,6 +347,6 @@ export const adminApi = {
 
 function normalizeVisibility(value?: string | null) {
   if (!value) return value;
-  const lower = value.toLowerCase();
-  return lower === 'public' || lower === 'private' ? lower : value;
+  const upper = value.toUpperCase();
+  return upper === 'PUBLIC' || upper === 'PRIVATE' ? upper : value;
 }

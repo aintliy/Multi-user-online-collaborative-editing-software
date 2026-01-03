@@ -62,4 +62,20 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     
       @Query("SELECT d FROM Document d WHERE d.status <> 'deleted' AND d.folder IS NOT NULL AND LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
        Page<Document> searchDocuments(@Param("keyword") String keyword, Pageable pageable);
+    
+    /**
+     * 检查同一 owner 同一 folder 下是否存在同名文档（排除已删除）
+     */
+    boolean existsByOwnerIdAndFolderIdAndTitleAndStatusNot(Long ownerId, Long folderId, String title, String status);
+    
+    /**
+     * 检查同一 owner 同一 folder 下是否存在同名文档（排除指定文档和已删除）
+     */
+    @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM Document d " +
+           "WHERE d.owner.id = :ownerId AND d.folder.id = :folderId AND d.title = :title " +
+           "AND d.id <> :excludeId AND d.status <> 'DELETED'")
+    boolean existsDuplicateTitleExcludingSelf(@Param("ownerId") Long ownerId, 
+                                               @Param("folderId") Long folderId, 
+                                               @Param("title") String title, 
+                                               @Param("excludeId") Long excludeId);
 }

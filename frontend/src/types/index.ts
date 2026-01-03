@@ -35,8 +35,9 @@ export interface Document {
   ownerId: number;
   ownerName?: string;
   ownerPublicId?: string;
+  ownerAvatarUrl?: string;
   owner?: User;
-  visibility: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
+  visibility: 'PUBLIC' | 'PRIVATE';
   docType: 'markdown' | 'txt';
   forkedFromId?: number;
   content?: string;
@@ -53,7 +54,7 @@ export interface Document {
 export interface CreateDocumentRequest {
   title: string;
   docType?: 'markdown' | 'txt';
-  visibility?: 'PUBLIC' | 'PRIVATE' | 'public' | 'private';
+  visibility?: 'PUBLIC' | 'PRIVATE';
   folderId?: number;
   tags?: string;
   content?: string;
@@ -128,27 +129,7 @@ export interface FriendMessage {
   sender?: User;
   receiver?: User;
   content: string;
-  messageType: 'TEXT' | 'SHARE_LINK';
-  shareLinkId?: number;
-  shareLinkInfo?: {
-    documentId: number;
-    documentTitle: string;
-    isUsed: boolean;
-    isExpired: boolean;
-  };
   isRead: boolean;
-  createdAt: string;
-}
-
-// 文档分享链接类型
-export interface ShareLink {
-  id: number;
-  documentId: number;
-  documentTitle: string;
-  token: string;
-  shareUrl: string;
-  isUsed: boolean;
-  expiresAt: string;
   createdAt: string;
 }
 
@@ -156,13 +137,15 @@ export interface ShareLink {
 export interface Comment {
   id: number;
   documentId: number;
-  user?: User;
+  userId: number;
+  username: string;
+  avatarUrl?: string;
   content: string;
   rangeInfo?: string;
-  parentId?: number;
-  status: 'OPEN' | 'RESOLVED';
+  replyToCommentId?: number;
+  status: string;
   createdAt: string;
-  replies?: Comment[];
+  updatedAt?: string;
 }
 
 // 通知相关类型

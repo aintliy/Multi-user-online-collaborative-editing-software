@@ -15,7 +15,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,7 +28,6 @@ public class FriendMessageService {
     
     private final FriendMessageRepository messageRepository;
     private final UserFriendRepository friendRepository;
-    private final DocumentShareLinkRepository shareLinkRepository;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
     
@@ -50,25 +48,11 @@ public class FriendMessageService {
                 .sender(sender)
                 .receiver(receiver)
                 .content(request.getContent())
-                .messageType(request.getMessageType() != null ? request.getMessageType() : "TEXT")
-                .shareLinkId(request.getShareLinkId())
                 .build();
         
         message = messageRepository.save(message);
         
         FriendMessageDTO dto = FriendMessageDTO.fromEntity(message);
-        
-        // 如果是分享链接消息，附加分享链接信息
-        if ("SHARE_LINK".equals(request.getMessageType()) && request.getShareLinkId() != null) {
-            shareLinkRepository.findById(request.getShareLinkId()).ifPresent(link -> {
-                dto.setShareLinkInfo(FriendMessageDTO.ShareLinkInfo.builder()
-                        .documentId(link.getDocument().getId())
-                        .documentTitle(link.getDocument().getTitle())
-                        .isUsed(link.getIsUsed())
-                        .isExpired(link.getExpiresAt().isBefore(LocalDateTime.now()))
-                        .build());
-            });
-        }
         
         // 向接收方发送实时通知
         sendRealTimeNotification(receiver, sender, dto);
@@ -160,19 +144,6 @@ public class FriendMessageService {
     }
     
     private FriendMessageDTO toDTO(FriendMessage message) {
-        FriendMessageDTO dto = FriendMessageDTO.fromEntity(message);
-        
-        if ("SHARE_LINK".equals(message.getMessageType()) && message.getShareLinkId() != null) {
-            shareLinkRepository.findById(message.getShareLinkId()).ifPresent(link -> {
-                dto.setShareLinkInfo(FriendMessageDTO.ShareLinkInfo.builder()
-                        .documentId(link.getDocument().getId())
-                        .documentTitle(link.getDocument().getTitle())
-                        .isUsed(link.getIsUsed())
-                        .isExpired(link.getExpiresAt().isBefore(LocalDateTime.now()))
-                        .build());
-            });
-        }
-        
-        return dto;
+        return FriendMessageDTO.fromEntity(message);
     }
 }

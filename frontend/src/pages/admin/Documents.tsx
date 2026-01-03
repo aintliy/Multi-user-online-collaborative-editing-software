@@ -77,8 +77,7 @@ const Documents: React.FC = () => {
       title: '可见性',
       dataIndex: 'visibility',
       render: (visibility: string) => {
-        const v = (visibility || '').toLowerCase();
-        const isPublic = v === 'public';
+        const isPublic = visibility === 'PUBLIC';
         return (
           <Tag color={isPublic ? 'blue' : 'default'}>
             {isPublic ? '公开' : '私有'}

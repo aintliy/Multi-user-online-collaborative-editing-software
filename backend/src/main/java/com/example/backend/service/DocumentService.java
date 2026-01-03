@@ -28,6 +28,7 @@ import com.example.backend.dto.document.MoveDocumentRequest;
 import com.example.backend.dto.document.UpdateDocumentRequest;
 import com.example.backend.dto.websocket.WebSocketMessage;
 import com.example.backend.entity.Document;
+import com.example.backend.entity.DocumentCollaborator;
 import com.example.backend.entity.DocumentFolder;
 import com.example.backend.entity.DocumentVersion;
 import com.example.backend.entity.User;
@@ -70,6 +71,12 @@ public class DocumentService {
     public DocumentDTO createDocument(Long userId, CreateDocumentRequest request) {
         User owner = userService.getUserById(userId);
         DocumentFolder folder = resolveFolder(userId, request.getFolderId());
+
+        // 检查同一 folder 下是否存在同名文档
+        if (documentRepository.existsByOwnerIdAndFolderIdAndTitleAndStatusNot(
+                userId, folder.getId(), request.getTitle(), STATUS_DELETED)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "该文件夹下已存在同名文档");
+        }
 
         // 创建物理存储目录并获取相对路径
         String storagePath = fileStorageService.createDocumentStoragePath(userId, folder.getId());
@@ -125,6 +132,11 @@ public class DocumentService {
         }
         
         if (request.getTitle() != null) {
+            // 检查同一 folder 下是否存在同名文档（排除当前文档）
+            if (document.getFolder() != null && documentRepository.existsDuplicateTitleExcludingSelf(
+                    userId, document.getFolder().getId(), request.getTitle(), documentId)) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "该文件夹下已存在同名文档");
+            }
             document.setTitle(request.getTitle());
         }
         if (request.getVisibility() != null) {
@@ -776,5 +788,18 @@ public class DocumentService {
                 .stream()
                 .map(doc -> DocumentDTO.fromEntity(doc, currentUserId, false))  // 公开文档默认不可编辑
                 .collect(java.util.stream.Collectors.toList());
+    }
+    
+    /**
+     * 获取用户已加入的协作文档列表（不包括自己创建的）
+     */
+    public List<DocumentDTO> getCollaboratingDocuments(Long userId) {
+        List<DocumentCollaborator> collaborations = collaboratorRepository.findByUserId(userId);
+        return collaborations.stream()
+                .map(collab -> collab.getDocument())
+                .filter(doc -> !doc.getOwner().getId().equals(userId)) // 排除自己创建的文档
+                .filter(doc -> STATUS_ACTIVE.equals(doc.getStatus()))  // 只返回活跃的文档
+                .map(doc -> DocumentDTO.fromEntity(doc, userId, true)) // 协作文档默认可编辑
+                .collect(Collectors.toList());
     }
 }

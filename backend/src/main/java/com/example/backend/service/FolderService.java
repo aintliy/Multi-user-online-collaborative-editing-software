@@ -34,7 +34,10 @@ public class FolderService {
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
     private final CollaborationCacheService collaborationCacheService;
-    
+
+    private static final String STATUS_DELETED = "DELETED";
+    private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_PRIVATE = "PRIVATE";
     /**
      * 获取用户的文件夹树
      */
@@ -99,7 +102,7 @@ public class FolderService {
         if (!legacyRoots.isEmpty()) {
             DocumentFolder root = legacyRoots.get(0);
             if (root.getStatus() == null) {
-                root.setStatus("ACTIVE");
+                root.setStatus(STATUS_ACTIVE);
             }
             return folderRepository.save(root);
         }
@@ -109,7 +112,7 @@ public class FolderService {
                 .owner(owner)
                 .name("根目录")
                 .parent(null)
-                .status("ACTIVE")
+                .status(STATUS_ACTIVE)
                 .build();
         return folderRepository.save(root);
     }
@@ -119,7 +122,7 @@ public class FolderService {
     }
 
     private boolean isDeletedFolder(DocumentFolder folder) {
-        return "deleted".equalsIgnoreCase(folder.getStatus());
+        return STATUS_DELETED.equalsIgnoreCase(folder.getStatus());
     }
 
     private List<DocumentFolder> collectFolderSubtree(DocumentFolder folder) {
@@ -144,22 +147,22 @@ public class FolderService {
         for (DocumentFolder current : subtree) {
             markDocumentsDeleted(current.getId());
             current.setParent(null);
-            current.setStatus("deleted");
+            current.setStatus(STATUS_DELETED);
         }
 
         folderRepository.saveAll(subtree);
     }
 
     private void markDocumentsDeleted(Long folderId) {
-        List<Document> documents = documentRepository.findByFolderIdAndStatusNot(folderId, "deleted");
+        List<Document> documents = documentRepository.findByFolderIdAndStatusNot(folderId, STATUS_DELETED);
         if (documents.isEmpty()) {
             return;
         }
 
         documents.forEach(doc -> {
             doc.setFolder(null);
-            doc.setStatus("deleted");
-            doc.setVisibility("private");
+            doc.setStatus(STATUS_DELETED);
+            doc.setVisibility(STATUS_PRIVATE);
             collaborationCacheService.clearDocumentState(doc.getId());
         });
 
@@ -203,7 +206,7 @@ public class FolderService {
                 .owner(owner)
                 .name(request.getName())
             .parent(parent)
-            .status("ACTIVE")
+            .status(STATUS_ACTIVE)
                 .build();
         
         folder = folderRepository.save(folder);

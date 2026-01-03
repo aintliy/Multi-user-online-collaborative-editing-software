@@ -18,7 +18,6 @@ import {
   Badge,
   Tabs,
   Spin,
-  Typography,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -29,8 +28,6 @@ import {
   CommentOutlined,
   MessageOutlined,
   UserOutlined,
-  ShareAltOutlined,
-  CopyOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
@@ -38,14 +35,14 @@ import { documentApi, collaboratorApi, commentApi, chatApi, userApi } from '../a
 import { useAuthStore } from '../store/useAuthStore';
 import { useDocumentStore } from '../store/useDocumentStore';
 import wsService from '../utils/websocket';
+import messageBatcher from '../utils/messageBatcher';
 import { getAvatarUrl } from '../utils/request';
-import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User, ShareLink } from '../types';
+import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User } from '../types';
 import dayjs from 'dayjs';
 import './DocumentEdit.scss';
  
 const { Header, Sider, Content } = Layout;
 const { TextArea } = Input;
-const { Paragraph } = Typography;
 
 // 映射文档类型到编辑器语言
 const getEditorLanguage = (docType: string): string => {
@@ -86,15 +83,15 @@ const DocumentEdit: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [newComment, setNewComment] = useState('');
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const sendingRef = useRef(false);
   
   // Modals
   const [commitModalOpen, setCommitModalOpen] = useState(false);
-  const [addCollaboratorModalOpen, setAddCollaboratorModalOpen] = useState(false);
-  const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
+  const [inviteCollaboratorModalOpen, setInviteCollaboratorModalOpen] = useState(false);
   const [collaboratorInfoModalOpen, setCollaboratorInfoModalOpen] = useState(false);
   const [searchUsers, setSearchUsers] = useState<User[]>([]);
-  const [currentShareLink, setCurrentShareLink] = useState<ShareLink | null>(null);
-  const [generatingShareLink, setGeneratingShareLink] = useState(false);
   const ttlTimerRef = useRef<number | null>(null);
   
   const [form] = Form.useForm();
@@ -117,6 +114,8 @@ const DocumentEdit: React.FC = () => {
       if (ttlTimerRef.current) {
         clearInterval(ttlTimerRef.current);
       }
+      // 清除待处理的批量消息
+      messageBatcher.clear();
     };
   }, [documentId]);
 
@@ -137,7 +136,8 @@ const DocumentEdit: React.FC = () => {
       }
       if (msg.data?.user) {
         addOnlineUser(msg.data.user);
-        message.info(`${msg.data.user.username} 加入了协作`);
+        // 使用批处理器合并加入消息
+        messageBatcher.info(`${msg.data.user.username} 加入了协作`, 'join');
       }
     });
 
@@ -151,6 +151,10 @@ const DocumentEdit: React.FC = () => {
       const targetId = msg.data?.userId ?? msg.userId;
       if (targetId) {
         removeOnlineUser(targetId);
+        // 显示离开通知
+        if (msg.nickname && targetId !== user?.id) {
+          messageBatcher.info(`${msg.nickname} 离开了协作`, 'leave');
+        }
       }
     });
     
@@ -166,9 +170,11 @@ const DocumentEdit: React.FC = () => {
         setIsDirty(false);
         setDirty(false);
         if (msg.userId === user?.id) {
-          message.success('已保存到协作缓存');
+          // 使用批处理器合并自己的保存消息
+          messageBatcher.success('已保存到协作缓存', 'self-save');
         } else {
-          message.info(`${msg.nickname || '协作者'} 已保存内容`);
+          // 使用批处理器合并协作者保存消息
+          messageBatcher.info(`${msg.nickname || '协作者'} 已保存内容`, 'save');
         }
       }
     });
@@ -185,7 +191,24 @@ const DocumentEdit: React.FC = () => {
     });
     
     wsService.onMessage('CHAT', (msg) => {
-      setChatMessages(prev => [...prev, msg.data]);
+      // WebSocket返回的数据结构是 { userId, nickname, avatarUrl, content, id }
+      // 需要转换成 ChatMessage 格式
+      const chatMsg: ChatMessage = {
+        id: msg.data.id,
+        documentId: documentId,
+        content: msg.data.content,
+        createdAt: new Date().toISOString(),
+        user: {
+          id: msg.data.userId,
+          username: msg.data.nickname,
+          avatarUrl: msg.data.avatarUrl,
+        } as User,
+      };
+      setChatMessages(prev => [...prev, chatMsg]);
+      // 如果不是当前用户发送的消息，且聊天面板未打开，增加未读计数
+      if (msg.data.userId !== user?.id && activeTab !== 'chat') {
+        setUnreadChatCount(prev => prev + 1);
+      }
     });
   };
 
@@ -390,14 +413,14 @@ const DocumentEdit: React.FC = () => {
     });
   };
 
-  const handleVisibilityChange = async (value: 'public' | 'private') => {
+  const handleVisibilityChange = async (value: 'PUBLIC' | 'PRIVATE') => {
     if (!document) return;
     setVisibilityUpdating(true);
     try {
       const updated = await documentApi.update(documentId, { visibility: value });
       setDocument(updated);
       setCurrentDocument(updated);
-      message.success(value === 'public' ? '已设为公开' : '已设为私有');
+      message.success(value === 'PUBLIC' ? '已设为公开' : '已设为私有');
     } catch (error: any) {
       message.error(error.response?.data?.message || '更新可见性失败');
     } finally {
@@ -418,17 +441,16 @@ const DocumentEdit: React.FC = () => {
     }
   };
 
-  const handleAddCollaborator = async (values: any) => {
+  const handleInviteCollaborator = async (values: any) => {
     try {
       await collaboratorApi.add(documentId, {
         userId: values.userId,
       });
-      message.success('添加协作者成功');
-      setAddCollaboratorModalOpen(false);
+      message.success('邀请已发送，等待对方确认');
+      setInviteCollaboratorModalOpen(false);
       collaboratorForm.resetFields();
-      fetchCollaborators();
     } catch (error: any) {
-      message.error(error.response?.data?.message || '添加失败');
+      message.error(error.response?.data?.message || '邀请失败');
     }
   };
 
@@ -443,35 +465,22 @@ const DocumentEdit: React.FC = () => {
   };
 
   const handleSendChatMessage = () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || sendingRef.current) return;
+    sendingRef.current = true;
     wsService.sendChatMessage(newMessage);
     setNewMessage('');
-  };
-
-  const handleGenerateShareLink = async () => {
-    setGeneratingShareLink(true);
-    try {
-      const shareLink = await documentApi.createShareLink(documentId);
-      setCurrentShareLink(shareLink);
-      setShareLinkModalOpen(true);
-    } catch (error: any) {
-      message.error(error.response?.data?.message || '生成分享链接失败');
-    } finally {
-      setGeneratingShareLink(false);
-    }
-  };
-
-  const handleCopyShareLink = () => {
-    if (currentShareLink) {
-      navigator.clipboard.writeText(currentShareLink.token);
-      message.success('分享链接已复制，请在好友聊天中发送');
-    }
+    // 延迟重置发送状态，防止快速重复点击
+    setTimeout(() => {
+      sendingRef.current = false;
+    }, 300);
   };
 
   const handleAddComment = async (content: string) => {
+    if (!content.trim()) return;
     try {
       await commentApi.create(documentId, { content });
       message.success('评论成功');
+      setNewComment('');
       fetchComments();
     } catch (error: any) {
       message.error(error.response?.data?.message || '评论失败');
@@ -503,18 +512,18 @@ const DocumentEdit: React.FC = () => {
             document?.isOwner ? (
               <Select
                 size="small"
-                value={document.visibility?.toLowerCase() === 'public' ? 'public' : 'private'}
+                value={document.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE'}
                 style={{ width: 120 }}
                 onChange={handleVisibilityChange}
                 loading={visibilityUpdating}
                 options={[
-                  { value: 'private', label: '私有' },
-                  { value: 'public', label: '公开' },
+                  { value: 'PRIVATE', label: '私有' },
+                  { value: 'PUBLIC', label: '公开' },
                 ]}
               />
             ) : (
-              <Tag color={document.visibility === 'public' ? 'green' : 'default'}>
-                {document.visibility === 'public' ? '公开' : '私有'}
+              <Tag color={document.visibility === 'PUBLIC' ? 'green' : 'default'}>
+                {document.visibility === 'PUBLIC' ? '公开' : '私有'}
               </Tag>
             )
           )}
@@ -547,15 +556,6 @@ const DocumentEdit: React.FC = () => {
                 <Button onClick={() => setCommitModalOpen(true)}>
                   提交版本
                 </Button>
-                {isOwner && (
-                  <Button
-                    icon={<ShareAltOutlined />}
-                    onClick={handleGenerateShareLink}
-                    loading={generatingShareLink}
-                  >
-                    分享
-                  </Button>
-                )}
               </>
             )}
             {isPreviewMode ? (
@@ -632,7 +632,12 @@ const DocumentEdit: React.FC = () => {
           <Sider width={360} theme="light" className="right-panel">
             <Tabs
               activeKey={activeTab}
-              onChange={setActiveTab}
+              onChange={(key) => {
+                setActiveTab(key);
+                if (key === 'chat') {
+                  setUnreadChatCount(0);
+                }
+              }}
               items={[
                 {
                   key: 'comments',
@@ -644,8 +649,8 @@ const DocumentEdit: React.FC = () => {
                         renderItem={(comment) => (
                           <List.Item>
                             <List.Item.Meta
-                              avatar={<Avatar src={getAvatarUrl(comment.user?.avatarUrl)} icon={<UserOutlined />} />}
-                              title={comment.user?.username}
+                              avatar={<Avatar src={getAvatarUrl(comment.avatarUrl)} icon={<UserOutlined />} />}
+                              title={comment.username}
                               description={
                                 <>
                                   <div>{comment.content}</div>
@@ -662,21 +667,34 @@ const DocumentEdit: React.FC = () => {
                         <TextArea
                           placeholder="添加评论..."
                           autoSize={{ minRows: 2, maxRows: 4 }}
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
                           onPressEnter={(e) => {
                             if (!e.shiftKey) {
                               e.preventDefault();
-                              handleAddComment((e.target as any).value);
-                              (e.target as any).value = '';
+                              handleAddComment(newComment);
                             }
                           }}
                         />
+                        <Button
+                          type="primary"
+                          size="small"
+                          style={{ marginTop: 8 }}
+                          onClick={() => handleAddComment(newComment)}
+                        >
+                          发送评论
+                        </Button>
                       </div>
                     </div>
                   ),
                 },
                 {
                   key: 'chat',
-                  label: <span><MessageOutlined /> 聊天</span>,
+                  label: (
+                    <Badge count={unreadChatCount} size="small" offset={[8, 0]}>
+                      <span><MessageOutlined /> 聊天</span>
+                    </Badge>
+                  ),
                   children: (
                     <div className="panel-content chat-panel">
                       <div className="chat-messages">
@@ -773,8 +791,8 @@ const DocumentEdit: React.FC = () => {
         size={400}
         extra={
           isOwner && (
-            <Button type="primary" onClick={() => setAddCollaboratorModalOpen(true)}>
-              添加协作者
+            <Button type="primary" onClick={() => setInviteCollaboratorModalOpen(true)}>
+              邀请协作者
             </Button>
           )
         }
@@ -816,17 +834,17 @@ const DocumentEdit: React.FC = () => {
         />
       </Drawer>
 
-      {/* Add Collaborator Modal */}
+      {/* Invite Collaborator Modal */}
       <Modal
-        title="添加协作者"
-        open={addCollaboratorModalOpen}
+        title="邀请协作者"
+        open={inviteCollaboratorModalOpen}
         onCancel={() => {
-          setAddCollaboratorModalOpen(false);
+          setInviteCollaboratorModalOpen(false);
           collaboratorForm.resetFields();
         }}
         onOk={() => collaboratorForm.submit()}
       >
-        <Form form={collaboratorForm} layout="vertical" onFinish={handleAddCollaborator}>
+        <Form form={collaboratorForm} layout="vertical" onFinish={handleInviteCollaborator}>
           <Form.Item
             name="userId"
             label="选择用户"
@@ -849,53 +867,6 @@ const DocumentEdit: React.FC = () => {
             </Select>
           </Form.Item>
         </Form>
-      </Modal>
-
-      {/* Share Link Modal */}
-      <Modal
-        title="分享文档"
-        open={shareLinkModalOpen}
-        onCancel={() => {
-          setShareLinkModalOpen(false);
-          setCurrentShareLink(null);
-        }}
-        footer={[
-          <Button key="close" onClick={() => setShareLinkModalOpen(false)}>
-            关闭
-          </Button>,
-          <Button
-            key="copy"
-            type="primary"
-            icon={<CopyOutlined />}
-            onClick={handleCopyShareLink}
-          >
-            复制链接
-          </Button>,
-        ]}
-      >
-        {currentShareLink && (
-          <div className="share-link-content">
-            <p>已生成一次性分享链接，该链接仅可使用一次。</p>
-            <p>请将以下链接复制到<strong>好友聊天</strong>中发送给好友：</p>
-            <Paragraph
-              copyable={{
-                text: currentShareLink.token,
-                tooltips: ['复制', '已复制'],
-              }}
-              className="share-token"
-            >
-              {currentShareLink.token}
-            </Paragraph>
-            <p className="share-notice">
-              ⚠️ 注意：此链接仅可在好友聊天窗口中使用，好友点击后将成为此文档的协作者。
-            </p>
-            {currentShareLink.expiresAt && (
-              <p className="share-expire">
-                有效期至: {dayjs(currentShareLink.expiresAt).format('YYYY-MM-DD HH:mm')}
-              </p>
-            )}
-          </div>
-        )}
       </Modal>
 
       {/* Collaborator Info Modal (for preview mode) */}
