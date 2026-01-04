@@ -1,19 +1,26 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.collaborator.*;
-import com.example.backend.entity.*;
-import com.example.backend.exception.BusinessException;
-import com.example.backend.exception.ErrorCode;
-import com.example.backend.repository.*;
-
-import lombok.RequiredArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import com.example.backend.dto.collaborator.AddCollaboratorRequest;
+import com.example.backend.dto.collaborator.CollaboratorDTO;
+import com.example.backend.dto.collaborator.WorkspaceRequestDTO;
+import com.example.backend.entity.Document;
+import com.example.backend.entity.DocumentCollaborator;
+import com.example.backend.entity.DocumentWorkspaceRequest;
+import com.example.backend.entity.User;
+import com.example.backend.exception.BusinessException;
+import com.example.backend.exception.ErrorCode;
+import com.example.backend.repository.DocumentCollaboratorRepository;
+import com.example.backend.repository.DocumentRepository;
+import com.example.backend.repository.DocumentWorkspaceRequestRepository;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * 协作服务
@@ -207,7 +214,7 @@ public class CollaboratorService {
         Document document = getDocumentById(documentId);
         
         // 只能申请公开文档
-        if (!"public".equals(document.getVisibility())) {
+        if (!"PUBLIC".equalsIgnoreCase(document.getVisibility())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只能申请加入公开文档的协作工作区");
         }
         
