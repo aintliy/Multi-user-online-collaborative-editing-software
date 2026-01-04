@@ -336,9 +336,21 @@ export const adminApi = {
   getDocuments: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
     get<PageResponse<Document>>('/admin/documents', { params }),
   
-  // 删除文档
+  // 删除文档（移入回收站）
   deleteDocument: (documentId: number) =>
     del<void>(`/admin/documents/${documentId}`),
+  
+  // 获取回收站文档
+  getDeletedDocuments: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
+    get<PageResponse<Document>>('/admin/documents/trash', { params }),
+  
+  // 恢复文档
+  restoreDocument: (documentId: number) =>
+    post<void>(`/admin/documents/${documentId}/restore`),
+  
+  // 永久删除文档
+  permanentDeleteDocument: (documentId: number) =>
+    del<void>(`/admin/documents/${documentId}/permanent`),
   
   // 获取操作日志
   getOperationLogs: (params?: { userId?: number; operationType?: string; page?: number; pageSize?: number }) =>

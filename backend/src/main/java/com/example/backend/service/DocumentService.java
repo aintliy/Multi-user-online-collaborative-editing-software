@@ -276,8 +276,9 @@ public class DocumentService {
         }
 
         if (isAdmin) {
+            // 物理删除：删除存储文件
             if (document.getStoragePath() != null) {
-                fileStorageService.deleteFile(document.getStoragePath());
+                fileStorageService.deleteDocumentFile(document.getStoragePath(), document.getTitle());
             }
             collaborationCacheService.clearDocumentState(documentId);
             documentRepository.delete(document);

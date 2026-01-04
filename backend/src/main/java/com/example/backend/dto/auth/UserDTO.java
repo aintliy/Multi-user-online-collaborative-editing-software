@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
  * 用户信息DTO
  */
@@ -24,6 +26,8 @@ public class UserDTO {
     private String profile;
     private String role;
     private String status;
+    private LocalDateTime createdAt;
+    private LocalDateTime lastLoginAt;
     
     public static UserDTO fromEntity(User user) {
         return UserDTO.builder()
@@ -35,6 +39,8 @@ public class UserDTO {
                 .profile(user.getProfile())
                 .role(user.getRole())
                 .status(user.getStatus())
+                .createdAt(user.getCreatedAt())
+                .lastLoginAt(user.getLastLoginAt())
                 .build();
     }
 }

@@ -7,7 +7,6 @@ import com.example.backend.dto.auth.UserDTO;
 import com.example.backend.dto.document.DocumentDTO;
 import com.example.backend.entity.DocumentWorkspaceRequest;
 
-import jakarta.persistence.Column;
 import lombok.Data;
 
 /**

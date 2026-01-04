@@ -30,6 +30,7 @@ public class ErrorCode {
     public static final int FOLDER_NAME_DUPLICATE = 3003;
     public static final int DOCUMENT_ACCESS_DENIED = 3004;
     public static final int VERSION_NOT_FOUND = 3005;
+    public static final int INVALID_OPERATION = 3006;
     
     // 协作相关错误码 4xxx
     public static final int COLLABORATOR_ALREADY_EXISTS = 4001;

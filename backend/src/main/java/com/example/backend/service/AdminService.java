@@ -1,5 +1,7 @@
 package com.example.backend.service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.backend.dto.OperationLogDTO;
 import com.example.backend.dto.PageResponse;
 import com.example.backend.dto.auth.UserDTO;
 import com.example.backend.dto.document.DocumentDTO;
@@ -42,11 +45,20 @@ public class AdminService {
     public Map<String, Object> getStats() {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalUsers", userRepository.count());
-        stats.put("ACTIVEUsers", userRepository.countByStatus("ACTIVE"));
+        stats.put("activeUsers", userRepository.countByStatus("ACTIVE"));
         stats.put("bannedUsers", userRepository.countByStatus("BANNED"));
-        stats.put("totalDocuments", documentRepository.count());
+        stats.put("totalDocuments", documentRepository.countByStatusNot("deleted"));
         stats.put("publicDocuments", documentRepository.countByVisibility("public"));
         stats.put("privateDocuments", documentRepository.countByVisibility("private"));
+        
+        // 今日新建文档数
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        stats.put("todayDocuments", documentRepository.countByCreatedAtAfterAndStatusNot(todayStart, "deleted"));
+        
+        // 最近7天活跃用户数（有登录记录的用户）
+        LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
+        stats.put("recentActiveUsers", userRepository.countByLastLoginAtAfter(weekAgo));
+        
         return stats;
     }
     
@@ -125,16 +137,16 @@ public class AdminService {
     }
     
     /**
-     * 获取文档列表
+     * 获取文档列表（排除已删除的）
      */
     public PageResponse<DocumentDTO> getDocuments(String keyword, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Document> documentPage;
         
         if (keyword != null && !keyword.isEmpty()) {
-            documentPage = documentRepository.searchDocuments(keyword, pageRequest);
+            documentPage = documentRepository.searchDocumentsExcludeDeleted(keyword, pageRequest);
         } else {
-            documentPage = documentRepository.findAll(pageRequest);
+            documentPage = documentRepository.findByStatusNot("DELETED", pageRequest);
         }
         
         List<DocumentDTO> documents = documentPage.getContent().stream()
@@ -145,7 +157,60 @@ public class AdminService {
     }
     
     /**
-     * 删除文档
+     * 获取回收站文档列表（已被用户逻辑删除的）
+     */
+    public PageResponse<DocumentDTO> getDeletedDocuments(String keyword, int page, int pageSize) {
+        PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        Page<Document> documentPage;
+        
+        if (keyword != null && !keyword.isEmpty()) {
+            documentPage = documentRepository.searchDeletedDocuments(keyword, pageRequest);
+        } else {
+            documentPage = documentRepository.findByStatus("DELETED", pageRequest);
+        }
+        
+        List<DocumentDTO> documents = documentPage.getContent().stream()
+                .map(doc -> DocumentDTO.fromEntity(doc, null, false))
+                .toList();
+        
+        return new PageResponse<>(documents, documentPage.getTotalElements(), page, pageSize);
+    }
+    
+    /**
+     * 恢复已删除的文档
+     */
+    @Transactional
+    public void restoreDocument(Long documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在"));
+        
+        if (!"DELETED".equals(document.getStatus())) {
+            throw new BusinessException(ErrorCode.INVALID_OPERATION, "文档未被删除");
+        }
+        
+        document.setStatus("ACTIVE");
+        documentRepository.save(document);
+        
+        // 记录操作日志
+        logOperation(documentId, "RESTORE_DOCUMENT", "DOC", "恢复文档: " + document.getTitle());
+    }
+    
+    /**
+     * 物理删除文档（永久删除）
+     */
+    @Transactional
+    public void permanentDeleteDocument(Long documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DOCUMENT_NOT_FOUND, "文档不存在"));
+        
+        // 记录操作日志
+        logOperation(documentId, "PERMANENT_DELETE_DOCUMENT", "DOC", "永久删除文档: " + document.getTitle());
+
+        documentService.deleteDocument(documentId, document.getOwner().getId(), true);
+    }
+    
+    /**
+     * 删除文档（逻辑删除）
      */
     @Transactional
     public void deleteDocument(Long documentId) {
@@ -155,13 +220,15 @@ public class AdminService {
         // 记录操作日志
         logOperation(documentId, "DELETE_DOCUMENT", "DOC", "删除文档: " + document.getTitle());
 
-        documentService.deleteDocument(documentId, document.getOwner().getId(), true);
+        // 逻辑删除
+        document.setStatus("DELETED");
+        documentRepository.save(document);
     }
     
     /**
      * 获取操作日志
      */
-    public PageResponse<OperationLog> getOperationLogs(Long userId, String operationType, int page, int pageSize) {
+    public PageResponse<OperationLogDTO> getOperationLogs(Long userId, String operationType, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<OperationLog> logPage;
         
@@ -173,7 +240,11 @@ public class AdminService {
             logPage = operationLogRepository.findAll(pageRequest);
         }
         
-        return new PageResponse<>(logPage.getContent(), logPage.getTotalElements(), page, pageSize);
+        List<OperationLogDTO> logs = logPage.getContent().stream()
+                .map(OperationLogDTO::fromEntity)
+                .toList();
+        
+        return new PageResponse<>(logs, logPage.getTotalElements(), page, pageSize);
     }
     
     /**

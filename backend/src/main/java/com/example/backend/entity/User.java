@@ -69,4 +69,10 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    /**
+     * 最后登录时间
+     */
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
 }

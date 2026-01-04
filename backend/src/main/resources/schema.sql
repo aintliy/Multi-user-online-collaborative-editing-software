@@ -35,17 +35,19 @@ CREATE TABLE users (
   status       VARCHAR(20)  DEFAULT 'ACTIVE',       -- ACTIVE / DISABLED
   role         VARCHAR(20)  DEFAULT 'USER',         -- ADMIN / USER（系统角色）
   created_at   TIMESTAMP  DEFAULT NOW(),
-  updated_at   TIMESTAMP  DEFAULT NOW()
+  updated_at   TIMESTAMP  DEFAULT NOW(),
+  last_login_at TIMESTAMP
 );
 
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_public_id ON users(public_id);
-
+CREATE INDEX idx_users_last_login ON users(last_login_at);
 COMMENT ON TABLE users IS '用户表';
 COMMENT ON COLUMN users.public_id IS '对外展示的随机不可变用户ID';
 COMMENT ON COLUMN users.role IS '系统角色: ADMIN-管理员, USER-普通用户';
 COMMENT ON COLUMN users.status IS '用户状态: ACTIVE-正常, DISABLED-已禁用';
+COMMENT ON COLUMN users.last_login_at IS '最后登录时间';
 
 -- =====================================================
 -- 2. 文档文件夹表 (document_folders)

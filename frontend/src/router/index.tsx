@@ -26,6 +26,7 @@ import UserRepos from '../pages/UserRepos';
 import AdminDashboard from '../pages/admin/Dashboard';
 import AdminUsers from '../pages/admin/Users';
 import AdminDocuments from '../pages/admin/Documents';
+import AdminTrash from '../pages/admin/Trash';
 import AdminLogs from '../pages/admin/Logs';
 
 // Protected Route Component
@@ -109,6 +110,7 @@ const AppRouter: React.FC = () => {
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="documents" element={<AdminDocuments />} />
+          <Route path="trash" element={<AdminTrash />} />
           <Route path="logs" element={<AdminLogs />} />
         </Route>
 

@@ -7,6 +7,7 @@ import {
   FileTextOutlined,
   HistoryOutlined,
   ArrowLeftOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import './AdminLayout.scss';
 
@@ -31,6 +32,11 @@ const AdminLayout: React.FC = () => {
       key: '/admin/documents',
       icon: <FileTextOutlined />,
       label: '文档管理',
+    },
+    {
+      key: '/admin/trash',
+      icon: <DeleteOutlined />,
+      label: '回收站',
     },
     {
       key: '/admin/logs',

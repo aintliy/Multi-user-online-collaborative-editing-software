@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,4 +35,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
            "OR LOWER(u.publicId) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     Page<User> searchUsers(@Param("keyword") String keyword, Pageable pageable);
+    
+    /**
+     * 统计指定时间后登录过的用户数
+     */
+    long countByLastLoginAtAfter(LocalDateTime dateTime);
 }

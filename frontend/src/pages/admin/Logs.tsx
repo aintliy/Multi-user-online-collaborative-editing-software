@@ -18,7 +18,6 @@ interface OperationLog {
   targetType: string;
   targetId: number;
   description: string;
-  ipAddress: string;
   createdAt: string;
 }
 
@@ -83,13 +82,13 @@ const Logs: React.FC = () => {
       dataIndex: 'targetType',
     },
     {
+      title: '目标ID',
+      dataIndex: 'targetId',
+    },
+    {
       title: '描述',
       dataIndex: 'description',
       ellipsis: true,
-    },
-    {
-      title: 'IP地址',
-      dataIndex: 'ipAddress',
     },
     {
       title: '时间',

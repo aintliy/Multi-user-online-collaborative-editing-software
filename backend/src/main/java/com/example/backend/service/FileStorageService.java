@@ -209,25 +209,58 @@ public class FileStorageService {
         }
     }
     
+    // /**
+    //  * 删除单个文件
+    //  * 
+    //  * @param relativePath 文件的完整相对路径
+    //  */
+    // public void deleteFile(String relativePath) {
+    //     if (relativePath == null || relativePath.trim().isEmpty()) {
+    //         return;
+    //     }
+        
+    //     try {
+    //         Path filePath = Paths.get(storageRoot, relativePath);
+    //         if (Files.exists(filePath)) {
+    //             Files.delete(filePath);
+    //             log.debug("删除文件成功: {}", filePath);
+    //         }
+    //     } catch (IOException e) {
+    //         log.warn("删除文件失败: {}", relativePath, e);
+    //         // 删除失败不抛异常
+    //     }
+    // }
+    
     /**
-     * 删除单个文件
+     * 删除目录中指定文件名的文件（支持不同扩展名）
      * 
-     * @param relativePath 文件的完整相对路径
+     * @param storagePath 存储目录相对路径
+     * @param baseFileName 基础文件名（不含扩展名）
      */
-    public void deleteFile(String relativePath) {
-        if (relativePath == null || relativePath.trim().isEmpty()) {
+    public void deleteDocumentFile(String storagePath, String baseFileName) {
+        if (storagePath == null || storagePath.trim().isEmpty() || 
+            baseFileName == null || baseFileName.trim().isEmpty()) {
             return;
         }
         
         try {
-            Path filePath = Paths.get(storageRoot, relativePath);
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.debug("删除文件成功: {}", filePath);
+            Path directoryPath = Paths.get(storageRoot, storagePath);
+            if (!Files.exists(directoryPath) || !Files.isDirectory(directoryPath)) {
+                log.debug("目录不存在或不是目录: {}", directoryPath);
+                return;
+            }
+            
+            // 尝试删除常见扩展名的文件
+            String[] extensions = {"md", "txt"};
+            for (String ext : extensions) {
+                Path filePath = directoryPath.resolve(baseFileName + "." + ext);
+                if (Files.exists(filePath)) {
+                    Files.delete(filePath);
+                    log.info("删除文档文件成功: {}", filePath);
+                }
             }
         } catch (IOException e) {
-            log.warn("删除文件失败: {}", relativePath, e);
-            // 删除失败不抛异常
+            log.warn("删除文档文件失败: storagePath={}, fileName={}", storagePath, baseFileName, e);
         }
     }
     

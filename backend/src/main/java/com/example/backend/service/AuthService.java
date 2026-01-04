@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -161,6 +162,10 @@ public class AuthService {
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new BusinessException(ErrorCode.USER_DISABLED, "账号已被禁用，请联系管理员");
         }
+        
+        // 更新最后登录时间
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
         
         // 生成JWT
         String token = jwtUtil.generateToken(userDetails, user.getId());

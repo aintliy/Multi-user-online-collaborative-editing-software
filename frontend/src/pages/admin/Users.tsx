@@ -10,12 +10,20 @@ import {
   Modal,
   message,
   Select,
+  Badge,
+  Tooltip,
 } from 'antd';
 import { UserOutlined, StopOutlined, CheckCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../api';
+import { getAvatarUrl } from '../../utils/request';
 import type { User } from '../../types';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/zh-cn';
+
+dayjs.extend(relativeTime);
+dayjs.locale('zh-cn');
 
 const { Search } = Input;
 
@@ -93,16 +101,37 @@ const Users: React.FC = () => {
     });
   };
 
+  // 判断用户是否在线（5分钟内活跃）
+  const isOnline = (lastLoginAt?: string) => {
+    if (!lastLoginAt) return false;
+    return dayjs().diff(dayjs(lastLoginAt), 'minute') < 5;
+  };
+
+  // 获取活跃状态
+  const getActivityStatus = (lastLoginAt?: string) => {
+    if (!lastLoginAt) return { text: '从未登录', color: 'default' };
+    const diffMinutes = dayjs().diff(dayjs(lastLoginAt), 'minute');
+    if (diffMinutes < 5) return { text: '在线', color: 'green' };
+    if (diffMinutes < 60) return { text: dayjs(lastLoginAt).fromNow(), color: 'blue' };
+    if (diffMinutes < 1440) return { text: dayjs(lastLoginAt).fromNow(), color: 'orange' };
+    return { text: dayjs(lastLoginAt).fromNow(), color: 'default' };
+  };
+
   const columns: ColumnsType<User> = [
     {
       title: '用户',
       key: 'user',
-      render: (_, record) => (
-        <Space>
-          <Avatar src={record.avatarUrl} icon={<UserOutlined />} />
-          <span>{record.username}</span>
-        </Space>
-      ),
+      render: (_, record) => {
+        const online = isOnline(record.lastLoginAt);
+        return (
+          <Space>
+            <Badge dot status={online ? 'success' : 'default'} offset={[-4, 32]}>
+              <Avatar src={getAvatarUrl(record.avatarUrl)} icon={<UserOutlined />} />
+            </Badge>
+            <span>{record.username}</span>
+          </Space>
+        );
+      },
     },
     {
       title: '邮箱',
@@ -125,6 +154,18 @@ const Users: React.FC = () => {
           {status === 'ACTIVE' ? '正常' : '已禁用'}
         </Tag>
       ),
+    },
+    {
+      title: '活跃状态',
+      key: 'activity',
+      render: (_, record) => {
+        const activity = getActivityStatus(record.lastLoginAt);
+        return (
+          <Tooltip title={record.lastLoginAt ? `最后登录: ${dayjs(record.lastLoginAt).format('YYYY-MM-DD HH:mm:ss')}` : '从未登录'}>
+            <Tag color={activity.color}>{activity.text}</Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '注册时间',

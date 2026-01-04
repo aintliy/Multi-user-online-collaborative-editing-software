@@ -9,6 +9,7 @@ export interface User {
   role: 'USER' | 'ADMIN';
   status: string;
   createdAt?: string;
+  lastLoginAt?: string;
 }
 
 export interface LoginRequest {

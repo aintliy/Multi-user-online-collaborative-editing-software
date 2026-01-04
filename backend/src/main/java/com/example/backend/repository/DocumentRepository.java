@@ -33,12 +33,12 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
        Page<Document> findByVisibilityAndStatusNot(String visibility, String status, Pageable pageable);
     
-       @Query("SELECT d FROM Document d WHERE d.visibility = 'public' AND d.status <> 'deleted' AND d.folder IS NOT NULL AND " +
+       @Query("SELECT d FROM Document d WHERE d.visibility = 'PUBLIC' AND d.status <> 'DELETED' AND d.folder IS NOT NULL AND " +
            "(LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(d.tags) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<Document> searchPublicDocuments(@Param("keyword") String keyword, Pageable pageable);
     
-       @Query("SELECT d FROM Document d WHERE d.owner.id = :ownerId AND d.status <> 'deleted' AND d.folder IS NOT NULL AND " +
+       @Query("SELECT d FROM Document d WHERE d.owner.id = :ownerId AND d.status <> 'DELETED' AND d.folder IS NOT NULL AND " +
            "(LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(d.tags) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<Document> searchByOwnerAndKeyword(@Param("ownerId") Long ownerId, 
@@ -49,7 +49,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByFolderIdAndStatusNot(Long folderId, String status);
     
-    @Query("SELECT d FROM Document d WHERE d.owner.id = :ownerId AND d.visibility = 'public'")
+    @Query("SELECT d FROM Document d WHERE d.owner.id = :ownerId AND d.visibility = 'PUBLIC'")
     Page<Document> findPublicDocumentsByOwnerId(@Param("ownerId") Long ownerId, Pageable pageable);
     
     /**
@@ -57,11 +57,44 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
      */
     List<Document> findByOwnerIdAndVisibilityAndStatus(Long ownerId, String visibility, String status);
     
-       @Query("SELECT COUNT(d) FROM Document d WHERE d.visibility = :visibility AND d.status <> 'deleted'")
+       @Query("SELECT COUNT(d) FROM Document d WHERE d.visibility = :visibility AND d.status <> 'DELETED'")
        long countByVisibility(@Param("visibility") String visibility);
     
-      @Query("SELECT d FROM Document d WHERE d.status <> 'deleted' AND d.folder IS NOT NULL AND LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+      @Query("SELECT d FROM Document d WHERE d.status <> 'DELETED' AND d.folder IS NOT NULL AND LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
        Page<Document> searchDocuments(@Param("keyword") String keyword, Pageable pageable);
+    
+    /**
+     * 管理员搜索文档（排除已删除）
+     */
+    @Query("SELECT d FROM Document d WHERE d.status <> 'DELETED' AND LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Document> searchDocumentsExcludeDeleted(@Param("keyword") String keyword, Pageable pageable);
+    
+    /**
+     * 搜索已删除的文档
+     */
+    @Query("SELECT d FROM Document d WHERE d.status = 'DELETED' AND LOWER(d.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Document> searchDeletedDocuments(@Param("keyword") String keyword, Pageable pageable);
+    
+    /**
+     * 按状态查找文档
+     */
+    Page<Document> findByStatus(String status, Pageable pageable);
+    
+    /**
+     * 按状态排除查找文档
+     */
+    Page<Document> findByStatusNot(String status, Pageable pageable);
+    
+    /**
+     * 统计非删除状态的文档数
+     */
+    long countByStatusNot(String status);
+    
+    /**
+     * 统计指定时间后创建的非删除文档数
+     */
+    @Query("SELECT COUNT(d) FROM Document d WHERE d.createdAt > :dateTime AND d.status <> :status")
+    long countByCreatedAtAfterAndStatusNot(@Param("dateTime") java.time.LocalDateTime dateTime, @Param("status") String status);
     
     /**
      * 检查同一 owner 同一 folder 下是否存在同名文档（排除已删除）

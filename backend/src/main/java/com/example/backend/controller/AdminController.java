@@ -1,10 +1,10 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.ApiResponse;
+import com.example.backend.dto.OperationLogDTO;
 import com.example.backend.dto.PageResponse;
 import com.example.backend.dto.auth.UserDTO;
 import com.example.backend.dto.document.DocumentDTO;
-import com.example.backend.entity.OperationLog;
 import com.example.backend.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -73,7 +73,7 @@ public class AdminController {
     }
     
     /**
-     * 获取文档列表
+     * 获取文档列表（排除已删除）
      */
     @GetMapping("/documents")
     public ApiResponse<PageResponse<DocumentDTO>> getDocuments(
@@ -85,24 +85,54 @@ public class AdminController {
     }
     
     /**
-     * 删除文档
+     * 获取回收站文档列表
+     */
+    @GetMapping("/documents/trash")
+    public ApiResponse<PageResponse<DocumentDTO>> getDeletedDocuments(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        PageResponse<DocumentDTO> response = adminService.getDeletedDocuments(keyword, page, pageSize);
+        return ApiResponse.success(response);
+    }
+    
+    /**
+     * 恢复已删除的文档
+     */
+    @PostMapping("/documents/{documentId}/restore")
+    public ApiResponse<Void> restoreDocument(@PathVariable Long documentId) {
+        adminService.restoreDocument(documentId);
+        return ApiResponse.success("文档已恢复");
+    }
+    
+    /**
+     * 删除文档（逻辑删除，移入回收站）
      */
     @DeleteMapping("/documents/{documentId}")
     public ApiResponse<Void> deleteDocument(@PathVariable Long documentId) {
         adminService.deleteDocument(documentId);
-        return ApiResponse.success("文档已删除");
+        return ApiResponse.success("文档已移入回收站");
+    }
+    
+    /**
+     * 永久删除文档（物理删除）
+     */
+    @DeleteMapping("/documents/{documentId}/permanent")
+    public ApiResponse<Void> permanentDeleteDocument(@PathVariable Long documentId) {
+        adminService.permanentDeleteDocument(documentId);
+        return ApiResponse.success("文档已永久删除");
     }
     
     /**
      * 获取操作日志
      */
     @GetMapping("/operation-logs")
-    public ApiResponse<PageResponse<OperationLog>> getOperationLogs(
+    public ApiResponse<PageResponse<OperationLogDTO>> getOperationLogs(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String operationType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
-        PageResponse<OperationLog> response = adminService.getOperationLogs(userId, operationType, page, pageSize);
+        PageResponse<OperationLogDTO> response = adminService.getOperationLogs(userId, operationType, page, pageSize);
         return ApiResponse.success(response);
     }
 }
