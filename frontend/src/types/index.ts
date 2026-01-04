@@ -194,9 +194,13 @@ export interface WebSocketMessage {
 
 export interface CursorPosition {
   userId: number;
+  nickname?: string;
+  color?: string;
   line?: number;
   column?: number;
   position?: number;
+  isTyping?: boolean;
+  lastActivity?: number;
 }
 
 export interface DocumentOperation {

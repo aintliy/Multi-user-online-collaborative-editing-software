@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class CollaborationCacheService {
 
     private static final int DEFAULT_DRAFT_TTL_HOURS = 1;
+    private static final int DEFAULT_CONFIRMED_TTL_HOURS = 1;
     private static final int DEFAULT_SAVE_LOCK_TTL_SECONDS = 5;
 
     private final StringRedisTemplate stringRedisTemplate;
@@ -59,7 +60,7 @@ public class CollaborationCacheService {
         if (documentId == null || content == null) {
             return;
         }
-        stringRedisTemplate.opsForValue().set(confirmedKey(documentId), content);
+        stringRedisTemplate.opsForValue().set(confirmedKey(documentId), content, DEFAULT_CONFIRMED_TTL_HOURS, TimeUnit.HOURS);
     }
 
     public String getConfirmed(Long documentId) {

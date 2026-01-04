@@ -4,7 +4,6 @@ import {
   Layout,
   Button,
   Space,
-  Dropdown,
   Modal,
   Form,
   Input,
@@ -37,10 +36,20 @@ import { useDocumentStore } from '../store/useDocumentStore';
 import wsService from '../utils/websocket';
 import messageBatcher from '../utils/messageBatcher';
 import { getAvatarUrl } from '../utils/request';
-import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User } from '../types';
+import type { Document, DocumentVersion, Collaborator, Comment, ChatMessage, User, CursorPosition } from '../types';
 import dayjs from 'dayjs';
 import './DocumentEdit.scss';
- 
+
+// 用户颜色生成函数
+const getUserColor = (userId: number): string => {
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+  ];
+  return colors[userId % colors.length];
+};
+
+
 const { Header, Sider, Content } = Layout;
 const { TextArea } = Input;
 
@@ -59,8 +68,17 @@ const DocumentEdit: React.FC = () => {
   const { user, token } = useAuthStore();
   const { content, setContent, setCurrentDocument, onlineUsers, addOnlineUser, removeOnlineUser, updateCursor, clearOnlineData, setOnlineUsers, setDirty } = useDocumentStore();
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
   const applyingRemoteRef = useRef(false);
   const joinedRef = useRef(false);
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
+  const cursorDecorationsRef = useRef<string[]>([]);
+  const cursorWidgetsRef = useRef<Map<number, any>>(new Map());
+  const typingTimeoutRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  
+  // 远程用户光标和输入状态
+  const [remoteCursors, setRemoteCursors] = useState<Map<number, CursorPosition>>(new Map());
+  const [typingUsers, setTypingUsers] = useState<Map<number, string>>(new Map()); // userId -> nickname
   
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,17 +103,20 @@ const DocumentEdit: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [newComment, setNewComment] = useState('');
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadCommentCount, setUnreadCommentCount] = useState(0);
   const sendingRef = useRef(false);
   
   // Modals
   const [commitModalOpen, setCommitModalOpen] = useState(false);
   const [inviteCollaboratorModalOpen, setInviteCollaboratorModalOpen] = useState(false);
   const [collaboratorInfoModalOpen, setCollaboratorInfoModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [searchUsers, setSearchUsers] = useState<User[]>([]);
   const ttlTimerRef = useRef<number | null>(null);
   
   const [form] = Form.useForm();
   const [collaboratorForm] = Form.useForm();
+  const [exportForm] = Form.useForm();
 
   const documentId = parseInt(id!);
   const isAdmin = user?.role === 'ADMIN';
@@ -116,6 +137,21 @@ const DocumentEdit: React.FC = () => {
       }
       // 清除待处理的批量消息
       messageBatcher.clear();
+      // 清除所有输入超时定时器
+      typingTimeoutRef.current.forEach((timeout) => clearTimeout(timeout));
+      typingTimeoutRef.current.clear();
+      // 清除光标装饰器
+      if (editorRef.current && cursorDecorationsRef.current.length > 0) {
+        editorRef.current.deltaDecorations(cursorDecorationsRef.current, []);
+        cursorDecorationsRef.current = [];
+      }
+      // 清除光标 content widgets
+      if (editorRef.current) {
+        cursorWidgetsRef.current.forEach((widget) => {
+          editorRef.current.removeContentWidget(widget);
+        });
+        cursorWidgetsRef.current.clear();
+      }
     };
   }, [documentId]);
 
@@ -126,8 +162,27 @@ const DocumentEdit: React.FC = () => {
         joinedRef.current = true;
         setupWebSocketHandlers();
       }).catch(console.error);
+      
+      // 清理函数：移除所有消息处理器，防止重复注册
+      return () => {
+        wsService.offMessage('JOIN');
+        wsService.offMessage('ONLINE_USERS');
+        wsService.offMessage('LEAVE');
+        wsService.offMessage('DRAFT_EDIT');
+        wsService.offMessage('SAVE_CONFIRMED');
+        wsService.offMessage('SAVE_REJECTED');
+        wsService.offMessage('CURSOR');
+        wsService.offMessage('CHAT');
+      };
     }
   }, [document, token, isPreviewMode]);
+
+  // 聊天消息更新后自动滚动到底部
+  useEffect(() => {
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
 
   const setupWebSocketHandlers = () => {
     wsService.onMessage('JOIN', (msg) => {
@@ -151,6 +206,17 @@ const DocumentEdit: React.FC = () => {
       const targetId = msg.data?.userId ?? msg.userId;
       if (targetId) {
         removeOnlineUser(targetId);
+        // 清除该用户的光标和输入状态
+        setRemoteCursors(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(targetId);
+          return newMap;
+        });
+        setTypingUsers(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(targetId);
+          return newMap;
+        });
         // 显示离开通知
         if (msg.nickname && targetId !== user?.id) {
           messageBatcher.info(`${msg.nickname} 离开了协作`, 'leave');
@@ -161,6 +227,31 @@ const DocumentEdit: React.FC = () => {
     wsService.onMessage('DRAFT_EDIT', (msg) => {
       if (msg.userId !== user?.id && msg.data?.content) {
         applyRemoteContent(msg.data.content, true);
+        // 标记用户正在输入
+        const typingUserId = msg.userId;
+        const typingNickname = msg.nickname;
+        if (typingUserId && typingNickname) {
+          setTypingUsers(prev => {
+            const newMap = new Map(prev);
+            newMap.set(typingUserId, typingNickname);
+            return newMap;
+          });
+          // 清除之前的超时
+          const existingTimeout = typingTimeoutRef.current.get(typingUserId);
+          if (existingTimeout) {
+            clearTimeout(existingTimeout);
+          }
+          // 设置新的超时，2秒后清除输入状态
+          const timeout = setTimeout(() => {
+            setTypingUsers(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(typingUserId);
+              return newMap;
+            });
+            typingTimeoutRef.current.delete(typingUserId);
+          }, 2000);
+          typingTimeoutRef.current.set(typingUserId, timeout);
+        }
       }
     });
     
@@ -185,8 +276,20 @@ const DocumentEdit: React.FC = () => {
     
     wsService.onMessage('CURSOR', (msg) => {
       const targetId = msg.userId ?? msg.data?.userId;
-      if (targetId && targetId !== user?.id) {
-        updateCursor(targetId, msg.data || {});
+      if (targetId && targetId !== user?.id && msg.data) {
+        updateCursor(targetId, msg.data);
+        // 更新远程光标状态
+        setRemoteCursors(prev => {
+          const newMap = new Map(prev);
+          newMap.set(targetId, {
+            userId: targetId,
+            nickname: msg.nickname || msg.data.nickname,
+            line: msg.data.line,
+            column: msg.data.column,
+            color: getUserColor(targetId),
+          });
+          return newMap;
+        });
       }
     });
     
@@ -206,7 +309,7 @@ const DocumentEdit: React.FC = () => {
       };
       setChatMessages(prev => [...prev, chatMsg]);
       // 如果不是当前用户发送的消息，且聊天面板未打开，增加未读计数
-      if (msg.data.userId !== user?.id && activeTab !== 'chat') {
+      if (msg.data.userId !== user?.id && (!rightPanelOpen || activeTab !== 'chat')) {
         setUnreadChatCount(prev => prev + 1);
       }
     });
@@ -280,6 +383,76 @@ const DocumentEdit: React.FC = () => {
     }
   }, [draftTtlSeconds, ttlWarningShown]);
 
+  // 渲染远程用户光标装饰器
+  useEffect(() => {
+    if (!editorRef.current || !monacoRef.current) return;
+    
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    const decorations: any[] = [];
+    
+    // 移除旧的 content widgets
+    cursorWidgetsRef.current.forEach((widget) => {
+      editor.removeContentWidget(widget);
+    });
+    cursorWidgetsRef.current.clear();
+    
+    remoteCursors.forEach((cursor, remoteUserId) => {
+      if (remoteUserId === user?.id) return; // 跳过自己
+      if (!cursor.line || !cursor.column) return;
+      
+      const colorIndex = remoteUserId % 10;
+      const isTyping = typingUsers.has(remoteUserId);
+      const nickname = cursor.nickname || `用户${remoteUserId}`;
+      
+      // 光标位置装饰器（竖线）
+      decorations.push({
+        range: new monaco.Range(cursor.line, cursor.column, cursor.line, cursor.column),
+        options: {
+          className: `remote-cursor-${colorIndex}`,
+          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        }
+      });
+      
+      // 如果正在输入，高亮整行
+      if (isTyping) {
+        decorations.push({
+          range: new monaco.Range(cursor.line, 1, cursor.line, 1),
+          options: {
+            isWholeLine: true,
+            className: `remote-typing-${colorIndex}`,
+            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          }
+        });
+      }
+      
+      // 使用 content widget 显示用户名称标签（解决行末不显示问题）
+      const widgetId = `cursor-label-${remoteUserId}`;
+      const domNode = window.document.createElement('div');
+      domNode.className = `remote-cursor-label-${colorIndex}`;
+      domNode.textContent = isTyping ? `${nickname} 正在输入...` : nickname;
+      domNode.style.pointerEvents = 'none';
+      
+      const widget = {
+        getId: () => widgetId,
+        getDomNode: () => domNode,
+        getPosition: () => ({
+          position: { lineNumber: cursor.line, column: cursor.column },
+          preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE],
+        }),
+      };
+      
+      editor.addContentWidget(widget);
+      cursorWidgetsRef.current.set(remoteUserId, widget);
+    });
+    
+    // 更新装饰器
+    cursorDecorationsRef.current = editor.deltaDecorations(
+      cursorDecorationsRef.current,
+      decorations
+    );
+  }, [remoteCursors, typingUsers, user?.id]);
+
   const fetchCollaborators = async () => {
     try {
       const data = await collaboratorApi.getList(documentId);
@@ -301,7 +474,15 @@ const DocumentEdit: React.FC = () => {
   const fetchComments = async () => {
     try {
       const data = await commentApi.getList(documentId);
+      const oldCount = comments.length;
       setComments(data);
+      // 如果评论面板未打开，增加未读计数
+      if (!rightPanelOpen || activeTab !== 'comments') {
+        const newCommentsCount = Math.max(0, data.length - oldCount);
+        if (newCommentsCount > 0) {
+          setUnreadCommentCount(prev => prev + newCommentsCount);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch comments:', error);
     }
@@ -310,7 +491,19 @@ const DocumentEdit: React.FC = () => {
   const fetchChatHistory = async () => {
     try {
       const data = await chatApi.getHistory(documentId);
-      setChatMessages(data.items);
+      // 转换后端返回的数据格式为 ChatMessage 格式
+      const messages: ChatMessage[] = data.items.map((item: any) => ({
+        id: item.id,
+        documentId: item.documentId,
+        content: item.content,
+        createdAt: item.createdAt,
+        user: {
+          id: item.senderId,
+          username: item.senderName,
+          avatarUrl: item.avatarUrl,
+        } as User,
+      }));
+      setChatMessages(messages);
     } catch (error) {
       console.error('Failed to fetch chat history:', error);
     }
@@ -349,8 +542,56 @@ const DocumentEdit: React.FC = () => {
     }
   }, [setDirty, isPreviewMode]);
 
-  const handleEditorMount = (editor: any) => {
+  const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    
+    // 注入光标装饰器的CSS样式
+    const styleId = 'remote-cursor-styles';
+    if (!window.document.getElementById(styleId)) {
+      const style = window.document.createElement('style');
+      style.id = styleId;
+      const colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+        '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+      ];
+      let cssRules = '';
+      colors.forEach((color, index) => {
+        cssRules += `
+          .remote-cursor-${index} {
+            border-left: 2px solid ${color} !important;
+            border-right: none !important;
+          }
+          .remote-cursor-${index}::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -2px;
+            width: 6px;
+            height: 6px;
+            background-color: ${color};
+            border-radius: 50%;
+          }
+          .remote-cursor-label-${index} {
+            background-color: ${color};
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            z-index: 100;
+          }
+          .remote-typing-${index} {
+            background-color: ${color}15 !important;
+            border-left: 3px solid ${color} !important;
+          }
+        `;
+      });
+      style.textContent = cssRules;
+      window.document.head.appendChild(style);
+    }
     
     // Track cursor position
     editor.onDidChangeCursorPosition((e: any) => {
@@ -481,17 +722,61 @@ const DocumentEdit: React.FC = () => {
       await commentApi.create(documentId, { content });
       message.success('评论成功');
       setNewComment('');
-      fetchComments();
+      await fetchComments();
     } catch (error: any) {
       message.error(error.response?.data?.message || '评论失败');
     }
   };
 
-  const exportMenuItems = [
-    { key: 'pdf', label: 'PDF (.pdf)', onClick: () => window.open(documentApi.exportPdf(documentId)) },
-    { key: 'txt', label: '文本 (.txt)', onClick: () => window.open(documentApi.exportTxt(documentId)) },
-    { key: 'md', label: 'Markdown (.md)', onClick: () => window.open(documentApi.exportMd(documentId)) },
-  ];
+  const handleExport = async (values: { filename: string; format: string }) => {
+    const { filename, format } = values;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+    const exportUrl = `${baseUrl}/documents/${documentId}/export/${format}?filename=${encodeURIComponent(filename)}`;
+    
+    try {
+      // 使用 fetch 带认证 token 下载文件
+      const response = await fetch(exportUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('导出失败');
+      }
+      
+      // 获取文件内容并创建 Blob
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // 创建临时链接并触发下载
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = `${filename}.${format}`;
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
+      
+      // 释放 URL 对象
+      window.URL.revokeObjectURL(url);
+      
+      message.success(`文档导出成功`);
+      setExportModalOpen(false);
+      exportForm.resetFields();
+    } catch (error) {
+      message.error('导出失败，请重试');
+    }
+  };
+
+  const openExportModal = () => {
+    // 设置默认文件名为文档标题
+    exportForm.setFieldsValue({
+      filename: document?.title || '未命名文档',
+      format: document?.docType === 'txt' ? 'txt' : 'md',
+    });
+    setExportModalOpen(true);
+  };
 
   if (loading) {
     return <div className="loading">加载中...</div>;
@@ -533,13 +818,37 @@ const DocumentEdit: React.FC = () => {
         <div className="header-center">
           <Space>
             {onlineUsers.map(u => (
-              <Tooltip key={u.id} title={u.username}>
-                <Avatar
-                  size="small"
-                  src={getAvatarUrl(u.avatarUrl)}
-                  icon={<UserOutlined />}
-                  style={{ backgroundColor: `hsl(${u.id * 30 % 360}, 70%, 50%)` }}
-                />
+              <Tooltip 
+                key={u.id} 
+                title={
+                  <span className="user-cursor-indicator">
+                    <span 
+                      className="cursor-color-dot" 
+                      style={{ backgroundColor: getUserColor(u.id) }}
+                    />
+                    {u.username}
+                    {typingUsers.has(u.id) && (
+                      <span className="typing-indicator">输入中...</span>
+                    )}
+                  </span>
+                }
+              >
+                <Badge 
+                  dot={typingUsers.has(u.id)} 
+                  color={getUserColor(u.id)}
+                  offset={[-2, 2]}
+                >
+                  <Avatar
+                    size="small"
+                    src={getAvatarUrl(u.avatarUrl)}
+                    icon={<UserOutlined />}
+                    style={{ 
+                      backgroundColor: getUserColor(u.id),
+                      boxShadow: typingUsers.has(u.id) ? `0 0 0 2px ${getUserColor(u.id)}` : 'none',
+                      transition: 'box-shadow 0.3s ease'
+                    }}
+                  />
+                </Badge>
               </Tooltip>
             ))}
           </Space>
@@ -570,9 +879,7 @@ const DocumentEdit: React.FC = () => {
               </Button>
             ) : (
               <>
-                <Dropdown menu={{ items: exportMenuItems }}>
-                  <Button icon={<DownloadOutlined />}>导出</Button>
-                </Dropdown>
+                <Button onClick={openExportModal} icon={<DownloadOutlined />}>导出</Button>
                 <Button
                   icon={<HistoryOutlined />}
                   onClick={() => {
@@ -584,10 +891,17 @@ const DocumentEdit: React.FC = () => {
                   icon={<TeamOutlined />}
                   onClick={() => setCollaboratorsDrawerOpen(true)}
                 />
-                <Badge count={comments.length}>
+                <Badge count={unreadCommentCount}>
                   <Button
                     icon={<CommentOutlined />}
-                    onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                    onClick={() => {
+                      const willOpen = !rightPanelOpen;
+                      setRightPanelOpen(willOpen);
+                      if (willOpen) {
+                        setActiveTab('comments');
+                        setUnreadCommentCount(0);
+                      }
+                    }}
                   />
                 </Badge>
               </>
@@ -636,6 +950,8 @@ const DocumentEdit: React.FC = () => {
                 setActiveTab(key);
                 if (key === 'chat') {
                   setUnreadChatCount(0);
+                } else if (key === 'comments') {
+                  setUnreadCommentCount(0);
                 }
               }}
               items={[
@@ -697,7 +1013,7 @@ const DocumentEdit: React.FC = () => {
                   ),
                   children: (
                     <div className="panel-content chat-panel">
-                      <div className="chat-messages">
+                      <div className="chat-messages" ref={chatMessagesRef}>
                         {chatMessages.map((msg, index) => (
                           <div
                             key={index}
@@ -897,6 +1213,65 @@ const DocumentEdit: React.FC = () => {
             </List.Item>
           )}
         />
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal
+        title="导出文档"
+        open={exportModalOpen}
+        onCancel={() => {
+          setExportModalOpen(false);
+          exportForm.resetFields();
+        }}
+        onOk={() => exportForm.submit()}
+        okText="导出"
+        cancelText="取消"
+      >
+        <Form
+          form={exportForm}
+          layout="vertical"
+          onFinish={handleExport}
+        >
+          <Form.Item
+            name="filename"
+            label="文件名"
+            rules={[
+              { required: true, message: '请输入文件名' },
+              { pattern: /^[^\\/:*?"<>|]+$/, message: '文件名不能包含特殊字符' },
+            ]}
+          >
+            <Input placeholder="请输入导出文件名" />
+          </Form.Item>
+          <Form.Item
+            name="format"
+            label="导出格式"
+            rules={[{ required: true, message: '请选择导出格式' }]}
+          >
+            <Select placeholder="请选择导出格式">
+              <Select.Option value="md">
+                <Space>
+                  <span>📝</span>
+                  <span>Markdown (.md)</span>
+                </Space>
+              </Select.Option>
+              <Select.Option value="txt">
+                <Space>
+                  <span>📄</span>
+                  <span>纯文本 (.txt)</span>
+                </Space>
+              </Select.Option>
+              <Select.Option value="pdf">
+                <Space>
+                  <span>📕</span>
+                  <span>PDF 文档 (.pdf)</span>
+                </Space>
+              </Select.Option>
+            </Select>
+          </Form.Item>
+          <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
+            提示：文件将下载到浏览器默认下载目录
+          </div>
+        </Form>
       </Modal>
     </Layout>
   );

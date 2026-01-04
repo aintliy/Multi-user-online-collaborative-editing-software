@@ -8,12 +8,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
+import com.example.backend.config.WebSocketEventListener;
 import com.example.backend.dto.websocket.CursorPosition;
 import com.example.backend.dto.websocket.DocumentOperation;
 import com.example.backend.dto.websocket.WebSocketMessage;
@@ -40,6 +42,7 @@ public class WebSocketController {
     private final UserRepository userRepository;
         private final DocumentService documentService;
         private final CollaborationCacheService collaborationCacheService;
+        private final WebSocketEventListener webSocketEventListener;
     
     // 存储每个文档的光标位置
     private final Map<Long, Map<Long, CursorPosition>> documentCursors = new ConcurrentHashMap<>();
@@ -52,7 +55,9 @@ public class WebSocketController {
      * 加入文档协作
      */
     @MessageMapping("/document/{documentId}/join")
-    public void joinDocument(@DestinationVariable Long documentId, Principal principal) {
+    public void joinDocument(@DestinationVariable Long documentId, 
+                             @Header("simpSessionId") String sessionId,
+                             Principal principal) {
         if (principal == null) return;
         
         User user = userRepository.findByEmail(principal.getName()).orElse(null);
@@ -64,6 +69,9 @@ public class WebSocketController {
         // 添加在线用户到 Redis
         collaborationCacheService.addOnlineUser(documentId, user.getId());
         Set<Long> onlineUsers = collaborationCacheService.getOnlineUsers(documentId);
+        
+        // 注册 session 映射，用于断开时清理
+        webSocketEventListener.registerUserJoinDocument(sessionId, user.getId(), documentId);
 
         WebSocketMessage message = WebSocketMessage.builder()
             .type("JOIN")
@@ -87,11 +95,16 @@ public class WebSocketController {
      * 离开文档协作
      */
     @MessageMapping("/document/{documentId}/leave")
-    public void leaveDocument(@DestinationVariable Long documentId, Principal principal) {
+    public void leaveDocument(@DestinationVariable Long documentId, 
+                              @Header("simpSessionId") String sessionId,
+                              Principal principal) {
         if (principal == null) return;
         
         User user = userRepository.findByEmail(principal.getName()).orElse(null);
         if (user == null) return;
+        
+        // 注销 session 映射
+        webSocketEventListener.unregisterUserFromDocument(sessionId);
         
         // 移除用户
         collaborationCacheService.removeOnlineUser(documentId, user.getId());

@@ -1,5 +1,16 @@
 package com.example.backend.service;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.backend.dto.PageResponse;
 import com.example.backend.entity.ChatMessage;
 import com.example.backend.entity.Document;
@@ -8,17 +19,8 @@ import com.example.backend.exception.BusinessException;
 import com.example.backend.exception.ErrorCode;
 import com.example.backend.repository.ChatMessageRepository;
 import com.example.backend.repository.DocumentRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 聊天服务
@@ -72,6 +74,7 @@ public class ChatService {
                     item.put("documentId", msg.getDocument().getId());
                     item.put("senderId", msg.getSender().getId());
                     item.put("senderName", msg.getSender().getUsername());
+                    item.put("avatarUrl", msg.getSender().getAvatarUrl());
                     item.put("content", msg.getContent());
                     item.put("createdAt", msg.getCreatedAt());
                     return item;

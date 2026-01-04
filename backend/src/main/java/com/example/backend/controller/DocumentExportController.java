@@ -11,9 +11,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.backend.dto.ApiResponse;
 import com.example.backend.entity.User;
 import com.example.backend.service.DocumentExportService;
 import com.example.backend.service.UserService;
@@ -37,53 +37,53 @@ public class DocumentExportController {
      * 导出文档为PDF格式
      */
     @GetMapping("/{id}/export/pdf")
-    public ApiResponse<ResponseEntity<byte[]>> exportToPdf(@AuthenticationPrincipal UserDetails userDetails,
-                                               @PathVariable Long id) throws Exception {
+    public ResponseEntity<byte[]> exportToPdf(@AuthenticationPrincipal UserDetails userDetails,
+                                               @PathVariable Long id,
+                                               @RequestParam(required = false, defaultValue = "document") String filename) throws Exception {
         User user = userService.getUserByEmail(userDetails.getUsername());
         byte[] content = documentExportService.exportToPdf(id, user.getId());
         
-        String filename = URLEncoder.encode("document.pdf", StandardCharsets.UTF_8);
-        return ApiResponse.success("导出成功",
-                ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+        String encodedFilename = URLEncoder.encode(filename + ".pdf", StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
                 .contentType(MediaType.APPLICATION_PDF)
-                .body(content)
-        );
+                .body(content);
     }
     
     /**
      * 导出文档为纯文本格式
      */
     @GetMapping("/{id}/export/txt")
-    public ApiResponse<ResponseEntity<byte[]>> exportToText(@AuthenticationPrincipal UserDetails userDetails,
-                                                @PathVariable Long id) {
+    public ResponseEntity<byte[]> exportToText(@AuthenticationPrincipal UserDetails userDetails,
+                                                @PathVariable Long id,
+                                                @RequestParam(required = false, defaultValue = "document") String filename) {
         User user = userService.getUserByEmail(userDetails.getUsername());
         byte[] content = documentExportService.exportToText(id, user.getId());
         
-        String filename = URLEncoder.encode("document.txt", StandardCharsets.UTF_8);
-        return ApiResponse.success("导出成功",
-                ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.TEXT_PLAIN)
-                .body(content)
-        );
+        String encodedFilename = URLEncoder.encode(filename + ".txt", StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
+                .contentType(new MediaType("text", "plain", StandardCharsets.UTF_8))
+                .body(content);
     }
     
     /**
      * 导出文档为Markdown格式
      */
     @GetMapping("/{id}/export/md")
-    public ApiResponse<ResponseEntity<byte[]>> exportToMarkdown(@AuthenticationPrincipal UserDetails userDetails,
-                                                    @PathVariable Long id) {
+    public ResponseEntity<byte[]> exportToMarkdown(@AuthenticationPrincipal UserDetails userDetails,
+                                                    @PathVariable Long id,
+                                                    @RequestParam(required = false, defaultValue = "document") String filename) {
         User user = userService.getUserByEmail(userDetails.getUsername());
         byte[] content = documentExportService.exportToMarkdown(id, user.getId());
         
-        String filename = URLEncoder.encode("document.md", StandardCharsets.UTF_8);
-        return ApiResponse.success("导出成功",
-                ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.TEXT_PLAIN)
-                .body(content)
-        );
+        String encodedFilename = URLEncoder.encode(filename + ".md", StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFilename)
+                .contentType(new MediaType("text", "markdown", StandardCharsets.UTF_8))
+                .body(content);
     }
 }
