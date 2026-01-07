@@ -47,13 +47,13 @@ public class AdminService {
         stats.put("totalUsers", userRepository.count());
         stats.put("activeUsers", userRepository.countByStatus("ACTIVE"));
         stats.put("bannedUsers", userRepository.countByStatus("BANNED"));
-        stats.put("totalDocuments", documentRepository.countByStatusNot("deleted"));
-        stats.put("publicDocuments", documentRepository.countByVisibility("public"));
-        stats.put("privateDocuments", documentRepository.countByVisibility("private"));
+        stats.put("totalDocuments", documentRepository.countByStatusNot("DELETED"));
+        stats.put("publicDocuments", documentRepository.countByVisibility("PUBLIC"));
+        stats.put("privateDocuments", documentRepository.countByVisibility("PRIVATE"));
         
         // 今日新建文档数
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
-        stats.put("todayDocuments", documentRepository.countByCreatedAtAfterAndStatusNot(todayStart, "deleted"));
+        stats.put("todayDocuments", documentRepository.countByCreatedAtAfterAndStatusNot(todayStart, "DELETED"));
         
         // 最近7天活跃用户数（有登录记录的用户）
         LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
